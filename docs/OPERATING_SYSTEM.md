@@ -51,15 +51,19 @@ flowchart LR
 - **Observation → Fact.** A single observation is one data point. A fact is
   what emerges once observations are normalized and, where the claim
   matters, corroborated by more than one independent observation — a
-  resolved product identity, a confirmed unit cost. A fact always remains
-  traceable to the observations beneath it.
+  resolved product identity, a price observed today, a confirmed unit cost.
+  A fact always remains traceable to the observations beneath it. The
+  observations themselves are permanent and immutable; the normalized fact
+  built from them is not eternal when what it describes can change in the
+  real world — see §4 for exactly how a fact stays current, goes stale, or
+  is superseded.
 - **Fact → Knowledge.** Facts are per-candidate. Knowledge is what Atlas
   learns *across* candidates and *across* time — that a category tends to
   saturate within a certain window of first ad activity, that a given
   formula version has proven more reliable than its predecessor, that a
   supplier's quoted shipping times have historically held up. Knowledge is
   derived from many facts and many past decisions; it is never a
-  substitute for checking today's facts.
+  substitute for checking today's current, non-stale facts.
 - **Knowledge → Decision.** A decision applies today's facts, informed by
   accumulated knowledge, to a specific candidate, producing a verdict with a
   confidence level and a citation trail. A decision is never knowledge
@@ -93,7 +97,7 @@ by repurposing an existing one to mean something else (see §7).
 |---|---|---|---|---|---|
 | **NewProductDiscovered** | Scout Agent | Trend Agent, Market Signal Agent, Product Intelligence Agent | Candidate reference, seed evidence citation(s), discovery source | Permanent — part of the historical record of how a candidate entered Atlas | Not retried as an action; if a consumer fails to process it, the event stays pending and is retried under the standing reasoning-failure policy until it succeeds or is recorded as failed |
 | **EvidenceCollected** | Any Discovery/Research agent that successfully stores a new observation | Product Intelligence Agent, the Analysis agent(s) whose inputs include that evidence type, the Evidence Ledger | Reference to the new observation (not a duplicate copy), source, compliance classification | Permanent — mirrors the underlying observation's permanence | The underlying collection attempt follows the transient-failure retry policy; once evidence exists, a missed event is recovered by replaying from the Evidence Ledger, not by re-doing the research |
-| **EvidenceChanged** | Any agent that observes a new observation superseding a prior one for the same fact | Analysis agents whose prior rating depended on the superseded observation, Opportunity Agent | Reference to the old observation, reference to the new one, which fact-type changed | Permanent — the record of why a score was recomputed | If a consumer fails to react, the reasoning-failure retry policy applies; if retries are exhausted, the affected score is marked stale rather than left looking current |
+| **EvidenceChanged** | The agent that normalizes a new observation into a normalized fact superseding a prior one for the same candidate (typically Product Intelligence Agent, or the Research-layer agent that owns that fact type) | Every Derived Metric, Agent Opinion, Consensus, or Executive Decision that recorded the superseded fact version as load-bearing — each is triggered to recompute | Reference to the superseded normalized fact (with its version), reference to the new one, which downstream computations listed it as load-bearing | Permanent — the record of why every downstream recomputation happened | If a load-bearing consumer fails to recompute, the reasoning-failure retry policy applies; if retries are exhausted, that Derived Metric, Opinion, Consensus, or Decision is marked stale rather than left looking current |
 | **ProviderFailed** | Any agent attempting to use a provider that errors, times out, or reveals a compliance regression | CEO Agent (health aggregation), the failing agent's own retry logic, the Escalation queue if the pattern crosses threshold | Which provider, which agent, nature of failure (transient vs. structural), timestamp | Permanent — part of that provider's reliability history, relevant to future Provider Access Spike re-verification | Triggers the transient-failure retry policy on the underlying request; repeated events for the same provider in a short window trigger escalation, not the event itself |
 | **TrendDetected** | Trend Agent | Product Intelligence Agent, Saturation Agent, Opportunity Agent | Candidate/category reference, direction, time window, confidence | Permanent — a fact about a point in time; later reads supersede it for "current" but don't erase it | Standard collection retry policy; if detection can't complete, no event fires and the gap is recorded as "not assessed," never silently absent |
 | **SupplierFound** | Supplier Agent | Margin Agent, Logistics Agent, Opportunity Agent | Candidate reference, sourcing observation reference, provider compliance classification | Permanent | Collection-level retry policy; if no match is found after retries, no event fires and the gap is explicit |
@@ -118,10 +122,18 @@ keeps forever.
   somewhere else.
 - **Long-term Memory.** Everything durable in Atlas, composed of exactly
   three specialized stores. Nothing is remembered long-term outside them:
-  - **Evidence Store.** Raw observations and normalized product identity,
-    with full provenance. The permanent factual bedrock. Nothing here is
-    ever edited — only superseded by a new observation, with the old one
-    left standing.
+  - **Evidence Store.** Two things live here, under two different
+    guarantees. **Raw observations** — the exact payload, source, and
+    timestamp Atlas retrieved — are immutable and permanent: never edited,
+    never deleted. **Normalized facts** built from those observations
+    (product identity, a price, a stock level, a demand read, a competitor
+    count) are traceable back to the raw observations that produced them
+    but are not eternal — many describe something that changes in the real
+    world, so each carries a validity window under an explicit freshness
+    policy and can become stale or be superseded by a newer normalized
+    fact. Superseding never erases the old normalized fact; it stays in the
+    Evidence Store as history, and only its standing as *current* changes.
+    §4 defines exactly how current truth is determined.
   - **Knowledge Base.** Generalized understanding accumulated across many
     candidates and many decisions over time — provider reliability history,
     formula-version track records, category-level heuristics that have
@@ -145,39 +157,75 @@ Every claim inside Atlas belongs to exactly one of five layers. The layer
 determines how much it can be trusted and whether it is permanent or must
 be recomputed.
 
-1. **Facts** — *permanent, in both senses: the record never disappears, and
-   the fact itself doesn't expire.* Raw observations and normalized product
-   identity. Nothing above this layer is ever treated as more certain than
-   the facts it rests on.
-2. **Derived Metrics** — *recomputable, not permanent.* Anything mechanically
-   computed from Facts by a versioned, deterministic formula — a margin
-   range, a logistics flag drawn directly from specs. Given the same Facts
-   and the same formula version, a Derived Metric always reproduces
-   identically, so it can always be thrown away and rebuilt. It is kept
-   historically because a decision was made using it, not because it is
-   itself irreplaceable.
+1. **Facts.** This layer has two sub-layers with different guarantees:
+   - **Raw observations** are *permanent as truth* — the exact record of
+     what was retrieved, from where, and when. Never edited, never
+     deleted, never expiring: a price observed on a given day is forever
+     true that it was observed then, at that value.
+   - **Normalized facts** (product identity, current price, current stock,
+     current demand read, current competitor count) are traceable to the
+     raw observations beneath them but are *not eternal*. Each carries a
+     validity window under an explicit **freshness policy** — a maximum
+     age, or a rule for when a newer observation supersedes an older one.
+     A normalized fact can become **stale** (its freshness window has
+     lapsed and nothing newer has replaced it) or be **superseded** (a
+     newer, valid normalized fact now exists for the same claim). A
+     superseded or stale normalized fact is never deleted or rewritten —
+     it remains in the Evidence Store as history; only its status as
+     *current* changes.
+
+   **"Current truth"** for any time-sensitive claim is the newest
+   normalized fact that is both valid under its freshness policy and not
+   superseded by something newer. If everything on record for a claim has
+   gone stale, Atlas has no current truth for it and treats it as unknown —
+   it never silently reuses the last stale value. Nothing above this layer
+   is ever treated as more certain than the current, non-stale normalized
+   facts it rests on.
+2. **Derived Metrics** — *recomputable, not permanent.* Anything
+   mechanically computed from the current normalized facts by a versioned,
+   deterministic formula — a margin range, a logistics flag drawn directly
+   from specs. Every Derived Metric records exactly which normalized-fact
+   version(s) it was computed from, not "the facts" in the abstract — given
+   the same fact versions and the same formula version, a Derived Metric
+   always reproduces identically, so it can always be thrown away and
+   rebuilt. It is kept historically because a decision was made using it,
+   not because it is itself irreplaceable. If a load-bearing fact version
+   it used is later superseded, the Derived Metric itself becomes a
+   candidate for recomputation (an `EvidenceChanged` event, §2).
 3. **Agent Opinions** — *recomputable, not permanent, always labeled.*
    Judgment calls that require reasoning rather than a formula —
    brandability, an unconfirmed risk flag, a positioning proposal. Always
-   versioned by the model and prompt that produced them, always expected to
-   change on a fresh run, and never mistaken for a Fact no matter how many
-   times it's repeated.
+   versioned by the model and prompt that produced them, and always records
+   which normalized-fact versions and Derived Metrics it was formed from,
+   so a later reviewer can tell whether it still reflects current facts or
+   was formed against something since superseded. Always expected to change
+   on a fresh run, and never mistaken for a Fact no matter how many times
+   it's repeated.
 4. **Consensus** — *recomputable.* The point where Derived Metrics and
    Agent Opinions are reconciled under the weakest-constraint rule and any
    standing veto (`AGENTS.md`'s Risk Agent authority) into one coherent
-   evidentiary position for a candidate. Consensus is not yet a decision —
-   it is what the Opportunity Agent works from before a verdict is drawn.
+   evidentiary position for a candidate. Consensus records the specific
+   Derived Metrics and Agent Opinions — and, transitively, the fact
+   versions beneath them — it reconciled; a Consensus formed on stale
+   inputs is itself flagged stale, never presented as current. Consensus is
+   not yet a decision — it is what the Opportunity Agent works from before
+   a verdict is drawn.
 5. **Executive Decision** — *permanent as history, never permanent as
    current truth.* The audited verdict that reaches the CEO Agent and,
-   eventually, Ahmed. Once made, it is recorded forever in Decision
-   History — it is never erased or edited. But it is not eternal guidance:
-   new Facts produce a new Executive Decision alongside it, never a rewrite
-   of the old one.
+   eventually, Ahmed. It records the exact Consensus — and, transitively,
+   every fact version — it was based on. Once made, it is recorded forever
+   in Decision History — it is never erased or edited. But it is not
+   eternal guidance: new or superseding facts produce a new Executive
+   Decision alongside it, citing newer fact versions, never a rewrite of
+   the old one.
 
-The distinction to hold onto: **Facts are permanent as truth. Everything
-above Facts is permanent only as history** — the record of having decided
-something stays forever, but the decision itself is always subject to being
-superseded the moment the Facts it rested on change.
+The distinction to hold onto: **raw observations are permanent as truth and
+never expire. Normalized facts, and everything built on them, are permanent
+only as history** — the record of what was believed, from which fact
+version, and when, stays forever, but *current truth* at any layer is
+always just the newest, non-stale normalized fact (or the metric, opinion,
+consensus, or decision built from it) — never a fact that has quietly gone
+stale and kept being relied on as if it hadn't.
 
 ---
 
@@ -212,6 +260,12 @@ No single mechanism prevents fabrication — a stack of them does:
   mention is never presented as a trend or theme (per Customer Voice
   Agent's rule in `AGENTS.md`) — this specifically guards against an LLM's
   tendency to generalize from one data point.
+- **Staleness is checked, not assumed away.** A normalized fact past its
+  freshness window is never treated as if it were still current — Atlas
+  either finds a newer fact or admits the claim is unknown right now.
+  Presenting stale data as current would itself be a quiet form of
+  fabrication: asserting something is true *now* that was only ever
+  confirmed true *then*.
 - **Provenance and compliance classification travel with every fact.** A
   claim can always be traced to a specific, named, compliance-checked
   source — not "some evidence," but *this* evidence, from *this* provider,
@@ -320,30 +374,41 @@ a human," and Atlas's autonomy is only ever the first.
 
 ## 9. Principles Every Future Implementation Must Satisfy
 
-1. No fact enters the system without a traceable citation.
+1. No fact enters the system without a traceable citation to a raw
+   observation.
 2. No opinion is ever presented as a fact — every output is labeled by its
    layer in the decision hierarchy.
-3. No permanent record is edited — only superseded, with full history
-   preserved.
-4. No agent communicates outside the event system and shared memory — there
+3. Raw observations are never edited or deleted. Normalized facts are never
+   edited either — only superseded by a newer normalized fact, with every
+   prior version preserved as history.
+4. "Current truth" for any time-sensitive fact is always the newest valid,
+   non-stale normalized fact under an explicit freshness policy — never a
+   stale fact kept in use because nothing newer has arrived.
+5. Every Derived Metric, Agent Opinion, Consensus, and Executive Decision
+   must record the specific fact version(s) it was built from.
+6. A superseded load-bearing fact triggers recomputation of everything
+   downstream that used it — or, if recomputation fails, an explicit
+   staleness marking, never silence.
+7. No agent communicates outside the event system and shared memory — there
    is no private, off-record coordination between agents.
-5. No confidence claim exceeds the confidence of its weakest load-bearing
+8. No confidence claim exceeds the confidence of its weakest load-bearing
    input.
-6. No provider is used outside its current Provider Access Spike
+9. No provider is used outside its current Provider Access Spike
    classification.
-7. "I don't know" is always an available, unpenalized output at every
-   layer, for every agent.
-8. Swapping deterministic logic for AI-assisted reasoning inside an agent
-   requires a version bump, never an architecture change.
-9. Adding a new provider or a new agent requires only an additive
-   extension — never a modification to an existing agent's or provider's
-   contract.
-10. No autonomous action crosses from research-and-decision into money
+10. "I don't know" is always an available, unpenalized output at every
+    layer, for every agent — including when every fact on record for a
+    claim has gone stale.
+11. Swapping deterministic logic for AI-assisted reasoning inside an agent
+    requires a version bump, never an architecture change.
+12. Adding a new provider or a new agent requires only an additive
+    extension — never a modification to an existing agent's or provider's
+    contract.
+13. No autonomous action crosses from research-and-decision into money
     movement or third-party representation without an explicit amendment
     to `AGENTS.md` by Ahmed.
-11. Autonomy expands only on an observed track record recorded in Decision
+14. Autonomy expands only on an observed track record recorded in Decision
     History — never on a calendar.
-12. Every escalation states what is uncertain and what the system would do
+15. Every escalation states what is uncertain and what the system would do
     about it, without doing it.
 
 ---
@@ -364,8 +429,9 @@ following remain permanently outside it, until and unless Ahmed amends
   even one Atlas itself recommends. Account creation and contractual
   acceptance remain a human act.
 - Overriding a Risk Agent veto.
-- Deleting or editing a permanent record — Facts and Decision History are
-  corrected only by superseding, never by erasure.
+- Deleting or editing a permanent record — raw observations are never
+  altered at all; normalized facts and Decision History are corrected only
+  by superseding, never by erasure.
 - Amending `AGENTS.md` or this document. Only Ahmed changes the rules Atlas
   operates under.
 - Expanding its own autonomy. The trust-ladder stage Atlas currently
