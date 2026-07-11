@@ -1,7 +1,15 @@
 from alembic import command
 from sqlalchemy import create_engine, inspect, text
 
-EXPECTED_TABLES = {"sources", "candidates", "collection_runs", "raw_observations"}
+EXPECTED_TABLES = {
+    "sources",
+    "candidates",
+    "collection_runs",
+    "raw_observations",
+    "facts",
+    "signals",
+    "events",
+}
 
 
 def _tables(db_url: str) -> set[str]:
@@ -60,3 +68,53 @@ def test_migration_0002_round_trip(alembic_config, db_url):
     command.upgrade(alembic_config, "head")
     assert "candidate_id" in _observation_columns(db_url)
     assert _manual_source_exists(db_url)
+
+
+def _tables_include(db_url: str, table_names: set[str]) -> bool:
+    engine = create_engine(db_url)
+    try:
+        actual = set(inspect(engine).get_table_names())
+        return table_names.issubset(actual)
+    finally:
+        engine.dispose()
+
+
+def _keepa_source_exists(db_url: str) -> bool:
+    engine = create_engine(db_url)
+    try:
+        with engine.connect() as conn:
+            row = conn.execute(text("SELECT 1 FROM sources WHERE key = 'keepa'")).first()
+        return row is not None
+    finally:
+        engine.dispose()
+
+
+def _collection_runs_candidate_nullable(db_url: str) -> bool:
+    engine = create_engine(db_url)
+    try:
+        cols = inspect(engine).get_columns("collection_runs")
+        for col in cols:
+            if col["name"] == "candidate_id":
+                return col["nullable"]
+        return False
+    finally:
+        engine.dispose()
+
+
+def test_migration_0003_round_trip(alembic_config, db_url):
+    # At head: Facts, Signals, Events tables exist; Keepa source seeded.
+    command.upgrade(alembic_config, "head")
+    assert _tables_include(db_url, {"facts", "signals", "events"})
+    assert _keepa_source_exists(db_url)
+    assert _collection_runs_candidate_nullable(db_url)
+
+    # Downgrade to 0002: new tables and Keepa source gone.
+    command.downgrade(alembic_config, "0002")
+    assert not _tables_include(db_url, {"facts", "signals", "events"})
+    assert not _keepa_source_exists(db_url)
+    assert not _collection_runs_candidate_nullable(db_url)
+
+    # Back up, leaving the database at head.
+    command.upgrade(alembic_config, "head")
+    assert _tables_include(db_url, {"facts", "signals", "events"})
+    assert _keepa_source_exists(db_url)

@@ -57,7 +57,7 @@ class CollectionRun(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         Uuid, primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()")
     )
-    candidate_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("candidates.id"))
+    candidate_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("candidates.id"))
     source_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("sources.id"))
     status: Mapped[str] = mapped_column(Text, default="pending", server_default=text("'pending'"))
     error: Mapped[str | None] = mapped_column(Text)
