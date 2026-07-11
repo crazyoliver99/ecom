@@ -1,0 +1,50 @@
+[project]
+name = "ecom-research"
+version = "0.1.0"
+description = "Internal ecommerce product research and decision system (modular monolith)"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi==0.139.0",
+    "uvicorn[standard]==0.51.0",
+    "sqlalchemy==2.0.51",
+    "alembic==1.18.5",
+    "pydantic==2.13.4",
+    "pydantic-settings==2.14.2",
+    "psycopg[binary]==3.3.4",
+]
+
+[dependency-groups]
+dev = [
+    "pytest==9.1.1",
+    "httpx==0.28.1",
+    "ruff==0.15.21",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["app", "tests", "migrations"]
+
+[tool.ruff.lint]
+# `Depends(...)` in defaults is FastAPI's dependency-injection idiom.
+flake8-bugbear.extend-immutable-calls = ["fastapi.Depends"]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # import sorting
+    "UP",  # pyupgrade
+    "B",   # bugbear
+    "SIM", # simplify
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
