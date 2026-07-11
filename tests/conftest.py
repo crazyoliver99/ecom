@@ -1,52 +1,42 @@
 """Shared test fixtures.
 
-Tests run against a real PostgreSQL database. The URL comes from
-TEST_DATABASE_URL, falling back to DATABASE_URL (see .env.example).
+SAFETY: tests run migrations up AND DOWN, which destroys data. They therefore
+require a DEDICATED test database via TEST_DATABASE_URL and refuse to run
+against anything else. There is deliberately NO fallback to DATABASE_URL.
 """
 
-import argparse
 import os
 
 import pytest
 from alembic import command
-from alembic.config import Config
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
+from tests.db_safety import load_test_database_url, make_alembic_config
+
 
 @pytest.fixture(scope="session")
 def db_url() -> str:
-    url = os.environ.get("TEST_DATABASE_URL") or os.environ.get("DATABASE_URL")
-    if not url:
-        # Fall back to the local .env file, same as the application does.
-        try:
-            from app.core.config import Settings
-
-            url = Settings().database_url
-        except Exception:
-            pytest.exit(
-                "Set TEST_DATABASE_URL or DATABASE_URL (or create a .env file, see "
-                ".env.example) pointing at a PostgreSQL database to run the tests.",
-                returncode=1,
-            )
-    return url
+    """The dedicated test-database URL. Exits with instructions if missing/unsafe."""
+    try:
+        return load_test_database_url(os.environ)
+    except RuntimeError as exc:
+        pytest.exit(str(exc), returncode=1)
 
 
 @pytest.fixture(scope="session")
-def alembic_config(db_url: str) -> Config:
-    cfg = Config("alembic.ini")
-    # Equivalent of `alembic -x db_url=... upgrade head` — migrations/env.py
-    # reads this so tests never depend on cached application settings.
-    cfg.cmd_opts = argparse.Namespace(x=[f"db_url={db_url}"])
-    return cfg
+def alembic_config(db_url: str):
+    return make_alembic_config(db_url)
 
 
 @pytest.fixture(scope="session")
-def migrated_db(alembic_config: Config, db_url: str):
-    """Ensure the schema is at head for tests that need tables."""
+def migrated_db(alembic_config, db_url: str):
+    """Schema at Alembic head for tests that need tables — and guaranteed to be
+    left at head again when the whole suite finishes."""
     command.upgrade(alembic_config, "head")
     yield db_url
+    command.upgrade(alembic_config, "head")
 
 
 @pytest.fixture(scope="session")

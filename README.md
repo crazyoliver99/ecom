@@ -51,11 +51,23 @@ completely: `docker compose down -v`.
 
 ## Running the tests
 
-The tests need a running database. Easiest path — start only the database:
+The tests need a **dedicated test database** (`TEST_DATABASE_URL` in your
+`.env` — it's in the template). This is a safety feature: the migration tests
+wipe whatever database they run against, so they refuse to run unless the
+database name contains `test`, and they never touch your real `DATABASE_URL`
+data. When it finishes, the suite leaves the test database migrated to the
+latest schema.
 
 ```bash
 docker compose up -d db
 uv run pytest
+```
+
+On a fresh setup, docker compose creates the `ecom_test` database
+automatically. If your database volume predates this feature, create it once:
+
+```bash
+docker compose exec db createdb -U ecom ecom_test
 ```
 
 Everything should be green. Add `-v` for a detailed list: `uv run pytest -v`.
@@ -82,7 +94,10 @@ uv run alembic downgrade -1     # undo the most recent one
 app/
   core/            settings, logging, errors, database session
   api/             HTTP endpoints (just /health for now)
-  ingestion/       owns: sources, collection_runs, raw_observations (append-only)
+  ingestion/       owns: sources, collection_runs, raw_observations
+                   (append-only, enforced at the application layer via the
+                   repository + ORM guards; direct SQL or database-owner
+                   access can still bypass this — a DB trigger is deferred)
   catalog/         owns: candidates (products come in a later phase)
   providers/       stub — external source adapters (gated by access spikes)
   scoring/         stub — deterministic scores
@@ -102,5 +117,7 @@ docs/providers/    provider access spike records (none yet)
 - **`/health` says `degraded`** — the database isn't up yet or the
   `DATABASE_URL` in your `.env` is wrong. Run `docker compose up -d db` and
   retry.
-- **Tests complain about DATABASE_URL** — make sure `.env` exists; then run
-  tests as `uv run --env-file .env pytest`.
+- **Tests complain about TEST_DATABASE_URL** — make sure `.env` exists and
+  contains the `TEST_DATABASE_URL` line from `.env.example`, and that the
+  test database exists (`docker compose exec db createdb -U ecom ecom_test`
+  if needed). The error message itself walks you through the fix.
