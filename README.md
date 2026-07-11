@@ -4,9 +4,10 @@ Internal ecommerce product research and decision system. One user, one machine,
 no cloud. The architecture and roadmap live in [`docs/FOUNDATION.md`](docs/FOUNDATION.md)
 — read that first.
 
-**Current state: Milestone M0** — the skeleton boots. There is a database, a
-health endpoint, migrations, logging, and tests. No external providers, no
-scoring, no AI yet (that's by design — see the phased plan in the foundation doc).
+**Current state: Milestone M1** — a working research notebook. You can register
+product candidates, attach evidence (notes + URLs) to them, and read it all
+back. No external providers, no scoring, no AI yet (that's by design — see the
+phased plan in the foundation doc).
 
 ---
 
@@ -48,6 +49,35 @@ PostgreSQL and builds the app). Then open:
 To stop everything: press `Ctrl+C` in that terminal, or run `docker compose down`.
 Your data survives restarts (it lives in a Docker volume). To wipe the database
 completely: `docker compose down -v`.
+
+## Using it as a research notebook
+
+Everything happens in your browser at **<http://localhost:8000/docs>**. Each
+endpoint has a "Try it out" button that turns it into a form.
+
+1. **Register a product candidate.** Open `POST /candidates`, click *Try it
+   out*, and fill in the JSON — only `name` is required:
+   ```json
+   {"name": "LED Dog Collar", "niche": "pets", "notes": "seen twice this week"}
+   ```
+   Press *Execute*. The response includes an `id` — that's your candidate.
+2. **Attach evidence whenever you spot something.** Open
+   `POST /candidates/{candidate_id}/observations`, paste the candidate's `id`,
+   and record what you saw, with the URL:
+   ```json
+   {
+     "payload": {"note": "8 advertisers running near-identical creatives"},
+     "source_url": "https://www.facebook.com/ads/library/?q=led%20dog%20collar"
+   }
+   ```
+   `payload` is free-form JSON — write whatever you observed. Evidence is
+   **permanent**: there is deliberately no way to edit or delete it through
+   the app, so your research trail stays honest.
+3. **Read your evidence back.** `GET /candidates/{candidate_id}/observations`
+   lists everything you collected, newest first.
+4. **Track where each idea stands.** `PATCH /candidates/{candidate_id}` with
+   `{"status": "collecting"}` (allowed: `new`, `collecting`, `analyzed`,
+   `decided`), and `GET /candidates?status=collecting` to see what's in flight.
 
 ## Running the tests
 

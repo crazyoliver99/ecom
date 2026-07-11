@@ -77,6 +77,8 @@ class RawObservation(Base):
     source_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("sources.id"))
     # Nullable: manual evidence entries are not produced by a collection run.
     run_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("collection_runs.id"))
+    # Nullable: future automated discovery may record evidence before a candidate exists.
+    candidate_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("candidates.id"), index=True)
     observation_type: Mapped[str] = mapped_column(Text)
     payload: Mapped[dict] = mapped_column(JSONB)
     # Nullable: a manually typed note may have no URL; API observations must set it.

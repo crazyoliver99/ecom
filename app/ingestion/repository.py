@@ -12,9 +12,9 @@ trigger could close that gap and is deliberately deferred for now.
 """
 
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.ingestion.models import RawObservation
@@ -33,6 +33,7 @@ class RawObservationRepository:
         fetched_at: datetime,
         source_url: str | None = None,
         run_id: uuid.UUID | None = None,
+        candidate_id: uuid.UUID | None = None,
     ) -> RawObservation:
         if fetched_at.tzinfo is None:
             raise ValueError("fetched_at must be timezone-aware (UTC)")
@@ -40,9 +41,10 @@ class RawObservationRepository:
             source_id=source_id,
             observation_type=observation_type,
             payload=payload,
-            fetched_at=fetched_at,
+            fetched_at=fetched_at.astimezone(UTC),
             source_url=source_url,
             run_id=run_id,
+            candidate_id=candidate_id,
         )
         self._session.add(observation)
         self._session.flush()
@@ -68,3 +70,19 @@ class RawObservationRepository:
             .limit(limit)
         )
         return list(self._session.scalars(stmt))
+
+    def list_for_candidate(
+        self, candidate_id: uuid.UUID, *, limit: int = 50, offset: int = 0
+    ) -> tuple[list[RawObservation], int]:
+        """Newest-first page of a candidate's evidence, plus the total count."""
+        where = RawObservation.candidate_id == candidate_id
+        stmt = (
+            select(RawObservation)
+            .where(where)
+            .order_by(RawObservation.created_at.desc(), RawObservation.id.desc())
+            .limit(limit)
+            .offset(offset)
+        )
+        items = list(self._session.scalars(stmt))
+        total = self._session.scalar(select(func.count()).select_from(RawObservation).where(where))
+        return items, int(total or 0)

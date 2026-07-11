@@ -26,6 +26,20 @@ class AppendOnlyViolation(AppError):
     error_code = "append_only_violation"
 
 
+class NotFoundError(AppError):
+    """Raised when a requested record does not exist."""
+
+    status_code = 404
+    error_code = "not_found"
+
+
+class ConfigurationError(AppError):
+    """Raised when the system is misconfigured (e.g. missing seed data)."""
+
+    status_code = 500
+    error_code = "configuration_error"
+
+
 def register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppError)
     async def handle_app_error(request: Request, exc: AppError) -> JSONResponse:
