@@ -4,10 +4,10 @@ Internal ecommerce product research and decision system. One user, one machine,
 no cloud. The architecture and roadmap live in [`docs/FOUNDATION.md`](docs/FOUNDATION.md)
 — read that first.
 
-**Current state: Milestone M1** — a working research notebook. You can register
-product candidates, attach evidence (notes + URLs) to them, and read it all
-back. No external providers, no scoring, no AI yet (that's by design — see the
-phased plan in the foundation doc).
+**Current state: Milestone M2 Foundation** — the signals layer is built. You can register
+product candidates and attach evidence. The system now has a complete observation → fact → signal → event pipeline
+(deterministic, append-only, provider-agnostic). The Keepa provider adapter is a stub ready for implementation.
+No live providers yet, no scoring, no AI (by design — see the phased plan in the foundation doc).
 
 ---
 
@@ -128,15 +128,20 @@ app/
                    (append-only, enforced at the application layer via the
                    repository + ORM guards; direct SQL or database-owner
                    access can still bypass this — a DB trigger is deferred)
+  signals/         owns: facts, signals, events (OPERATING_SYSTEM.md §4)
+                   fact & signal repositories, detector functions, orchestrator
+                   (append-only, enforced via ORM; See README.md for extending)
   catalog/         owns: candidates (products come in a later phase)
-  providers/       stub — external source adapters (gated by access spikes)
+  providers/       external source adapters (Keepa stub in place)
   scoring/         stub — deterministic scores
   analysis/        stub — LLM conclusions
   recommendation/  stub — final reports
 migrations/        database schema history (Alembic)
 tests/             automated tests
 docs/FOUNDATION.md the architecture document
-docs/providers/    provider access spike records (none yet)
+docs/AGENTS.md     the constitution of agents
+docs/OPERATING_SYSTEM.md the runtime philosophy
+docs/providers/    provider access spike records and decisions
 ```
 
 ## Troubleshooting
