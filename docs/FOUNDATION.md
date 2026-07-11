@@ -19,16 +19,17 @@ V1 is a **single-user, local-first research pipeline** with an HTTP API. It does
 
 **V1 source capabilities (only these):**
 
-> ⚠️ **All external-source availability is UNVERIFIED until the Provider Access Spike (§8.1) is completed.** The rows below describe *desired capabilities* and *candidate implementation routes* — not guaranteed integrations. Every capability has manual evidence entry as a floor and "unavailable" as an honest terminal status.
+> ✅ **The Provider Access Spike (§8.1) was completed 2026-07-11.** Verified findings, classifications, costs, and the owner action list live in [`docs/providers/SUMMARY.md`](providers/SUMMARY.md), with one sourced record per provider in `docs/providers/`. The table below reflects those verified outcomes; records are re-verified when a provider errors persistently or before adapter work begins.
 
-| Capability | Candidate implementation routes (to be verified in the spike) | Why first |
+| Capability | Verified route (2026-07-11, see spike record) | Why first |
 |---|---|---|
-| Meta ad intelligence | (a) an official Meta API **if our specific use case and access level support it** — the Ad Library API's scope, approval process, and dataset coverage for general ecommerce-ad search must be verified, not assumed; (b) a licensed third-party ad-intelligence provider; (c) manual evidence entry; (d) **unavailable** if no compliant route exists | Strongest "someone is spending money on this" signal |
-| Search demand (trends) | (a) the official Google Trends API — currently **access-controlled/alpha; must not be assumed available**; (b) a licensed third-party trends provider (SerpApi/Glimpse class); (c) pytrends flagged `best_effort`/fragile; (d) manual entry; (e) unavailable. Provider choice stays configurable | Demand trajectory |
-| Marketplace listings | (a) a licensed marketplace data provider (Keepa class — paid); (b) an official marketplace API if access requirements are met; (c) manual entry; (d) unavailable | Price, reviews, sales-rank proxy |
-| Manual evidence | You paste URLs/screenshots/notes — always available, no external dependency | Covers everything without an API |
+| Meta ad intelligence | Official Ad Library API is `needs_approval` and covers **commercial ads only for EU-delivered ads** (DSA scope); global commercial ads are `manual_only` via the web UI; licensed third-party tools are a deferred `paid_option` → [meta_ads.md](providers/meta_ads.md) | Strongest "someone is spending money on this" signal |
+| Search demand (trends) | Official Google Trends API remains closed alpha (`needs_approval`, applied-for); verified route is a `paid_option` provider (SerpApi free tier → DataForSEO per-task); pytrends is non-compliant → [google_trends.md](providers/google_trends.md) | Demand trajectory |
+| Marketplace listings | **Keepa** (`paid_option`, ~€49/mo) — Amazon PA-API was retired 2026-05; Creators API is structurally unavailable to a non-affiliate tool → [marketplace_amazon.md](providers/marketplace_amazon.md) | Price, reviews, sales-rank history proxy |
+| Suppliers | **CJ Dropshipping API is `usable_now`** (free, self-serve); AliExpress affiliate API `needs_approval` → [suppliers.md](providers/suppliers.md) | Cost/shipping for margin estimates |
+| Manual evidence | Always available, no external dependency (implemented in M1) | Covers everything without an API |
 
-TikTok, Reddit, supplier APIs, review mining, and competitor-store analysis are **interface-defined in V1 but implemented later** (see §8). In particular, **TikTok Commercial Content API availability, geographic coverage, and approval requirements must be verified before any implementation work**.
+TikTok ([tiktok.md](providers/tiktok.md): official ads `manual_only`, organic `blocked`, paid tools optional), Reddit ([reddit.md](providers/reddit.md): `needs_approval`), and competitor stores ([competitor_stores.md](providers/competitor_stores.md): `manual_only` floor + binding no-scraping policy) are **interface-defined in V1 but implemented per their spike classifications**.
 
 ## 2. Explicitly excluded from V1
 
