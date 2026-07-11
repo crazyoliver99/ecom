@@ -5,7 +5,7 @@
 | **Capability** | Meta ad intelligence — which ecommerce products are advertised on Facebook/Instagram, by whom, since when |
 | **Verified on** | 2026-07-11 |
 | **Target market** | United States |
-| **Legal entity** | Planned US LLC (not yet formed) |
+| **Legal entity** | Existing US LLC |
 | **Operator residency** | Unspecified — notes that depend on it are flagged |
 | **Use** | Single-user internal research tool |
 | **Final classification** | `needs_approval` (official API, EU-commercial-ads only) + `manual_only` (web UI, global) + `paid_option` (third-party tools) |

@@ -5,7 +5,7 @@
 | **Capability** | Search-demand / trends data (interest over time, related queries) |
 | **Verified on** | 2026-07-11 |
 | **Target market** | United States |
-| **Legal entity** | Planned US LLC (not yet formed) |
+| **Legal entity** | Existing US LLC |
 | **Operator residency** | Unspecified — notes that depend on it are flagged |
 | **Use** | Single-user internal research tool |
 | **Final classification** | `paid_option` (official API: `needs_approval`; pytrends/scraping: `blocked` as a compliant route) |

@@ -5,7 +5,7 @@
 | **Capability** | Marketplace data — prices, review counts/ratings, sales-rank history as demand/competition proxies |
 | **Verified on** | 2026-07-11 |
 | **Target market** | United States |
-| **Legal entity** | Planned US LLC (not yet formed) |
+| **Legal entity** | Existing US LLC |
 | **Operator residency** | Unspecified — notes that depend on it are flagged |
 | **Use** | Single-user internal research tool |
 | **Final classification** | `paid_option` via **Keepa** · PA-API 5.0: `blocked` (retired) · Creators API: `blocked` for us · SP-API: not applicable |

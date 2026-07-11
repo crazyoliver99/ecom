@@ -5,7 +5,7 @@
 | **Capability** | Competitor-store analysis (what a Shopify/WooCommerce store sells, prices, how established it is) |
 | **Verified on** | 2026-07-11 |
 | **Target market** | United States |
-| **Legal entity** | Planned US LLC (not yet formed) |
+| **Legal entity** | Existing US LLC |
 | **Operator residency** | Unspecified — notes that depend on it are flagged |
 | **Use** | Single-user internal research tool |
 | **Final classification** | `paid_option` for systematic data (StoreLeads-class); `manual_only` floor is usable now at $0. **Automated storefront scraping: blocked by policy.** |

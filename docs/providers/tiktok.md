@@ -5,7 +5,7 @@
 | **Capability** | TikTok ad intelligence + organic-content trend signals for ecommerce products |
 | **Verified on** | 2026-07-11 |
 | **Target market** | United States |
-| **Legal entity** | Planned US LLC (not yet formed) |
+| **Legal entity** | Existing US LLC |
 | **Operator residency** | Unspecified — notes that depend on it are flagged |
 | **Use** | Single-user internal research tool |
 | **Final classification** | Ads (official): `manual_only` · Organic (official API): `blocked` · Practical programmatic path: `paid_option` |

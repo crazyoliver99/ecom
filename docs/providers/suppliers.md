@@ -5,7 +5,7 @@
 | **Capability** | Supplier data — product cost, shipping options/times, stock, for margin & shipping-difficulty estimates |
 | **Verified on** | 2026-07-11 |
 | **Target market** | United States |
-| **Legal entity** | Planned US LLC (not yet formed) |
+| **Legal entity** | Existing US LLC |
 | **Operator residency** | Unspecified — notes that depend on it are flagged |
 | **Use** | Single-user internal research tool |
 | **Final classification** | CJ Dropshipping: `usable_now` · AliExpress affiliate API: `needs_approval` · Alibaba.com: `manual_only` |

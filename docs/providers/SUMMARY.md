@@ -1,6 +1,6 @@
 # Provider Access Spike — Summary & Decisions
 
-**Completed:** 2026-07-11 · **Business context for planning:** target market = **United States**; legal entity = **planned US LLC** (not yet formed); operator residency = **unspecified unless explicitly provided**; use = single-user internal research tool.
+**Completed:** 2026-07-11 · **Business context for planning:** target market = **United States**; legal entity = **existing US LLC**; operator residency = **unspecified unless explicitly provided**; use = single-user internal research tool.
 
 The system is **jurisdiction-agnostic**: records distinguish target market (drives data coverage), legal entity (drives contracts/accounts), and operator residency (drives identity verification and payment rails). Notes depending on residency or business type are flagged with: *"This may vary depending on the operator's country and legal entity."* All claims are sourced in the individual records in this directory. Third-party pricing figures must be re-confirmed on vendor pages before purchase.
 
