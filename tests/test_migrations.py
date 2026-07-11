@@ -10,6 +10,7 @@ EXPECTED_TABLES = {
     "signals",
     "events",
     "candidate_external_ids",
+    "collection_summaries",
 }
 
 
@@ -151,3 +152,17 @@ def test_migration_0003_round_trip(alembic_config, db_url):
     command.upgrade(alembic_config, "head")
     assert _tables_include(db_url, new_tables)
     assert _keepa_source_exists(db_url)
+
+
+def test_migration_0004_round_trip(alembic_config, db_url):
+    # At head: collection_summaries exists.
+    command.upgrade(alembic_config, "head")
+    assert _tables_include(db_url, {"collection_summaries"})
+
+    # Downgrade to 0003: it's gone.
+    command.downgrade(alembic_config, "0003")
+    assert not _tables_include(db_url, {"collection_summaries"})
+
+    # Back up, leaving the database at head.
+    command.upgrade(alembic_config, "head")
+    assert _tables_include(db_url, {"collection_summaries"})

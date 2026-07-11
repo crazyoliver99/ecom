@@ -24,6 +24,11 @@ class Settings(BaseSettings):
     # key — it lives only in this environment variable.
     keepa_api_key: str | None = None
 
+    # Default interval between autonomous collection cycles, in seconds.
+    # Overridable per invocation with `atlas schedule --interval-seconds`.
+    # Default 86400 = once per day.
+    keepa_collection_interval_seconds: int = 86400
+
 
 @lru_cache
 def get_settings() -> Settings:

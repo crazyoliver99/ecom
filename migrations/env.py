@@ -3,6 +3,7 @@ from logging.config import fileConfig
 # Import all model modules so Base.metadata knows every table
 # (required for autogenerate support later).
 import app.catalog.models  # noqa: F401
+import app.collection.models  # noqa: F401
 import app.ingestion.models  # noqa: F401
 import app.signals.models  # noqa: F401
 from alembic import context

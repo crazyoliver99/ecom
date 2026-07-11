@@ -4,14 +4,17 @@ Internal ecommerce product research and decision system. One user, one machine,
 no cloud. The architecture and roadmap live in [`docs/FOUNDATION.md`](docs/FOUNDATION.md)
 — read that first.
 
-**Current state: Milestone M2** — the first autonomous provider. On top of the M1
-research notebook, Atlas now has a complete, deterministic **observation → fact →
-signal → event** pipeline and a working **Keepa** collection job that runs it end
-to end over a fixed US bestseller category. Everything in this layer is
-append-only and provider-agnostic. No scoring and no AI yet (by design — see the
-phased plan in the foundation doc). Keepa is the *reference* provider: a second
-provider reuses this machinery and only adds its own adapter + collection job
-(see `app/signals/README.md`).
+**Current state: Atlas Autonomy M1** — Atlas can wake up on its own, collect, and
+explain what it did. On top of the Keepa reference provider (the deterministic
+**observation → fact → signal → event** pipeline over a fixed US bestseller
+category), there is now a **scheduler** that runs the collection job on a
+configurable interval with no human interaction, and every successful run
+produces one **deterministic collection summary** that `atlas morning-report`
+prints. Everything is append-only and provider-agnostic. No scoring, no AI, no
+opportunities, no dashboards, no notifications (by design — see the phased plan in
+the foundation doc). Keepa is the *reference* provider: a second provider reuses
+this machinery and only adds its own adapter + collection job (see
+`app/signals/README.md`).
 
 ---
 
@@ -91,25 +94,70 @@ observations, facts, signals, and events. It reads the API key **only** from
 
 ```bash
 # One-off run (defaults: category 3760901, up to 20 products):
-KEEPA_API_KEY=your-key uv run python -m app.cli collect-keepa
+KEEPA_API_KEY=your-key uv run atlas collect-keepa
 
 # Override the category node or product cap:
-KEEPA_API_KEY=your-key uv run python -m app.cli collect-keepa --category 3760901 --max-products 20
+KEEPA_API_KEY=your-key uv run atlas collect-keepa --category 3760901 --max-products 20
 ```
+
+(`uv run python -m app.cli ...` is equivalent to `uv run atlas ...`.)
 
 Exit codes: `0` success (including a legitimately empty bestseller list), `1`
 provider failure (the run is recorded `failed` and a `ProviderFailed` event is
 persisted; no candidates/facts/signals are created), `2` missing/invalid
 `KEEPA_API_KEY`.
 
-### Scheduling it (cron)
+## Autonomy: schedule + morning report
 
-To collect once a day at 07:00, add a crontab entry that loads the key from the
-environment and runs the command from the project directory:
+Atlas can run the collection on its own and then report exactly what happened.
+
+```bash
+# Wake up every N seconds and collect, indefinitely (Ctrl+C to stop):
+KEEPA_API_KEY=your-key uv run atlas schedule --interval-seconds 86400
+
+# Bounded run (e.g. for a smoke test): stop after 3 cycles.
+KEEPA_API_KEY=your-key uv run atlas schedule --interval-seconds 60 --max-cycles 3
+
+# Print the latest successful collection summary:
+uv run atlas morning-report
+```
+
+The default interval comes from `KEEPA_COLLECTION_INTERVAL_SECONDS` (86400 = one
+day). Each successful cycle generates and persists exactly one deterministic
+summary: start/end, duration, candidates discovered, new vs existing, observations
+stored, facts created, signals emitted, events emitted, and any provider
+warnings/errors. `atlas morning-report` prints the most recent one:
+
+```
+Atlas Morning Report
+====================
+
+Collection run : 9201079c-a6b4-42fa-aa7b-838901f1c42d
+Status         : succeeded
+Started        : 2026-07-11 07:00:00 UTC
+Finished       : 2026-07-11 07:00:04 UTC
+Duration       : 4.2s
+
+Candidates discovered      : 20
+  New candidates           : 3
+  Existing (updated)       : 17
+Observations stored        : 21
+Facts created              : 20
+Signals emitted            : 5
+Events emitted             : 48
+
+Provider warnings          : 0
+Provider errors            : 0
+```
+
+### Scheduling with cron instead
+
+`atlas schedule` is a long-lived process. If you prefer the OS scheduler, run a
+single collection per tick (each run generates its own summary):
 
 ```cron
-# m h dom mon dow   command
-0 7 * * *  cd /path/to/ecom && KEEPA_API_KEY=your-key /path/to/uv run python -m app.cli collect-keepa >> /var/log/ecom-keepa.log 2>&1
+# m h dom mon dow   command  (collect daily at 07:00)
+0 7 * * *  cd /path/to/ecom && KEEPA_API_KEY=your-key /path/to/uv run atlas collect-keepa >> /var/log/atlas-keepa.log 2>&1
 ```
 
 Each run is a fresh `collection_run`; facts and signals accumulate over days, so
@@ -118,7 +166,8 @@ Each run is a fresh `collection_run`; facts and signals accumulate over days, so
 ### Inspecting what it collected
 
 `docs/SQL_QUERIES.md` has copy-paste SQL for reading back candidates, the current
-truth per fact type, fired signals, and the event audit trail.
+truth per fact type, fired signals, the event audit trail, and collection
+summaries.
 
 ## Running the tests
 
@@ -174,7 +223,9 @@ app/
                    (append-only, enforced via ORM; See README.md for extending)
   catalog/         owns: candidates + external-id map (ASIN dedup)
   providers/       external source adapters (Keepa HTTP client; returns DTOs only)
-  collection/      collection jobs that wire a provider to persistence (Keepa job)
+  collection/      Keepa job, autonomous cycle, interval scheduler, and the
+                   deterministic collection summary (owns: collection_summaries)
+  cli.py           `atlas` command: collect-keepa, schedule, morning-report
   scoring/         stub — deterministic scores
   analysis/        stub — LLM conclusions
   recommendation/  stub — final reports

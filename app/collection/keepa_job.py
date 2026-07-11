@@ -59,6 +59,9 @@ class KeepaCollectionResult:
     signals: int = 0
     error: str | None = None
     signal_types: list[str] = field(default_factory=list)
+    # Non-fatal issues on an otherwise successful run (e.g. an ASIN the
+    # bestseller list named but the product endpoint did not return).
+    provider_warnings: list[str] = field(default_factory=list)
 
 
 def keepa_sales_rank_extractor(
@@ -172,7 +175,10 @@ def run_keepa_collection(
     for position, asin in enumerate(selected, start=1):
         product = products_by_asin.get(asin)
         if product is None:
-            # Requested but not returned by Keepa — skip; not an error.
+            # Requested but not returned by Keepa — a warning, not a failure.
+            result.provider_warnings.append(
+                f"ASIN {asin} was in the bestseller list but not returned by the product endpoint"
+            )
             continue
         rank = extract_sales_rank(product)
         title = product.get("title") or asin

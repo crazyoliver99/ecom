@@ -182,6 +182,42 @@ GROUP BY cr.id, cr.source_id, cr.status, cr.error
 ORDER BY cr.finished_at DESC;
 ```
 
+## Collection summaries (morning report)
+
+```sql
+-- The latest successful collection summary (what `atlas morning-report` prints).
+SELECT
+    run_id,
+    status,
+    started_at,
+    finished_at,
+    duration_seconds,
+    candidates_discovered,
+    new_candidates,
+    existing_candidates_updated,
+    observations_stored,
+    facts_created,
+    signals_emitted,
+    events_emitted,
+    jsonb_array_length(provider_warnings) AS warnings,
+    jsonb_array_length(provider_errors) AS errors
+FROM collection_summaries
+WHERE status = 'succeeded'
+ORDER BY finished_at DESC, created_at DESC
+LIMIT 1;
+
+-- Daily trend: discovery and signal volume over time.
+SELECT
+    finished_at::date AS day,
+    COUNT(*) AS runs,
+    SUM(new_candidates) AS new_candidates,
+    SUM(signals_emitted) AS signals
+FROM collection_summaries
+WHERE status = 'succeeded'
+GROUP BY finished_at::date
+ORDER BY day DESC;
+```
+
 ## Data Integrity Checks
 
 ```sql

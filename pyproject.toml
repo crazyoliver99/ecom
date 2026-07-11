@@ -21,6 +21,7 @@ dev = [
 ]
 
 [project.scripts]
+atlas = "app.cli:main"
 ecom = "app.cli:main"
 
 [build-system]

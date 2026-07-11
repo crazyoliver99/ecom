@@ -50,10 +50,14 @@ def get_latest_fact_of_type(
     Calling it after an insert would return the just-inserted row (the newest),
     which is never what a change detector wants.
     """
+    # Order by observed_at (when the value was actually observed) so "current
+    # truth" is the most-recently-observed fact. created_at/id are only
+    # tie-breakers: within a single DB transaction created_at (Postgres now())
+    # is identical across rows, so it cannot be the primary sort key.
     return session.execute(
         select(Fact)
         .where(Fact.candidate_id == candidate_id, Fact.fact_type == fact_type)
-        .order_by(Fact.created_at.desc(), Fact.id.desc())
+        .order_by(Fact.observed_at.desc(), Fact.created_at.desc(), Fact.id.desc())
         .limit(1)
     ).scalar_one_or_none()
 
