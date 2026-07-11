@@ -26,7 +26,7 @@ pillar they both operate within.
 
 ## 1. The Lifecycle of Work
 
-Everything Atlas produces travels through the same five stages. Nothing
+Everything Atlas produces travels through the same six stages. Nothing
 skips a stage, and nothing is trusted more than the stage it came from
 allows.
 
@@ -34,8 +34,10 @@ allows.
 flowchart LR
     IDEA[Idea] -->|checked against a real source| OBS[Observation]
     OBS -->|normalized and corroborated| FACT[Fact]
-    FACT -->|accumulated across candidates and time| KNOW[Knowledge]
-    KNOW -->|applied to a specific candidate| DEC[Decision]
+    FACT -->|deterministic detection of change| SIG[Signal]
+    SIG -->|accumulated across candidates and time| KNOW[Knowledge]
+    SIG -->|reasoned over by Analysis/Decision agents| DEC[Decision]
+    KNOW -->|informs| DEC
     DEC -.->|outcome recorded, feeds back| KNOW
 ```
 
@@ -57,17 +59,24 @@ flowchart LR
   built from them is not eternal when what it describes can change in the
   real world — see §4 for exactly how a fact stays current, goes stale, or
   is superseded.
-- **Fact → Knowledge.** Facts are per-candidate. Knowledge is what Atlas
-  learns *across* candidates and *across* time — that a category tends to
-  saturate within a certain window of first ad activity, that a given
-  formula version has proven more reliable than its predecessor, that a
-  supplier's quoted shipping times have historically held up. Knowledge is
-  derived from many facts and many past decisions; it is never a
-  substitute for checking today's current, non-stale facts.
-- **Knowledge → Decision.** A decision applies today's facts, informed by
+- **Fact → Signal.** Providers never get reasoned about directly — facts do,
+  through an intermediate step. A Signal is a deterministic, versioned
+  detection that something meaningful is happening to a candidate: a rank
+  improving, order velocity increasing, a new advertiser appearing, more
+  suppliers listing the same product. It is computed mechanically from one
+  or more facts (often comparing a current fact to a prior one), never
+  judged or interpreted. See §4 for the full definition.
+- **Signal → Knowledge.** Facts and Signals are per-candidate. Knowledge is
+  what Atlas learns *across* candidates and *across* time — that a category
+  tends to saturate within a certain window of first ad activity, that a
+  given formula version has proven more reliable than its predecessor, that
+  a supplier's quoted shipping times have historically held up. Knowledge is
+  derived from many facts, Signals, and past decisions; it is never a
+  substitute for checking today's current, non-stale Signals.
+- **Signal → Decision.** A decision applies today's Signals, informed by
   accumulated knowledge, to a specific candidate, producing a verdict with a
   confidence level and a citation trail. A decision is never knowledge
-  itself — it is knowledge and fact, applied once, to one case.
+  itself — it is knowledge and Signal, applied once, to one case.
 - **The loop closes.** What actually happens after a decision — did a
   launch work, did a watch item turn into an opportunity, did Ahmed
   disagree with a verdict — is itself recorded and becomes part of the
@@ -89,7 +98,11 @@ An event is an immutable, timestamped record that something happened. It is
 never a command — no event tells another agent what to conclude, only what
 has occurred and where to find the details. Every event has exactly one
 producer, zero or more consumers, and a persistence and retry behavior
-appropriate to what it represents. The list below is illustrative, not
+appropriate to what it represents. Where an event announces a detected
+pattern of change rather than a plain new observation — `TrendDetected`,
+`SupplierFound`, `CompetitionUpdated`, and others like them — its payload is
+a reference to the specific **Signal** object it announces (§4), not a
+loose description of "what changed." The list below is illustrative, not
 exhaustive: new capability is added by introducing new event types, never
 by repurposing an existing one to mean something else (see §7).
 
@@ -97,7 +110,7 @@ by repurposing an existing one to mean something else (see §7).
 |---|---|---|---|---|---|
 | **NewProductDiscovered** | Scout Agent | Trend Agent, Market Signal Agent, Product Intelligence Agent | Candidate reference, seed evidence citation(s), discovery source | Permanent — part of the historical record of how a candidate entered Atlas | Not retried as an action; if a consumer fails to process it, the event stays pending and is retried under the standing reasoning-failure policy until it succeeds or is recorded as failed |
 | **EvidenceCollected** | Any Discovery/Research agent that successfully stores a new observation | Product Intelligence Agent, the Analysis agent(s) whose inputs include that evidence type, the Evidence Ledger | Reference to the new observation (not a duplicate copy), source, compliance classification | Permanent — mirrors the underlying observation's permanence | The underlying collection attempt follows the transient-failure retry policy; once evidence exists, a missed event is recovered by replaying from the Evidence Ledger, not by re-doing the research |
-| **EvidenceChanged** | The agent that normalizes a new observation into a normalized fact superseding a prior one for the same candidate (typically Product Intelligence Agent, or the Research-layer agent that owns that fact type) | Every Derived Metric, Agent Opinion, Consensus, or Executive Decision that recorded the superseded fact version as load-bearing — each is triggered to recompute | Reference to the superseded normalized fact (with its version), reference to the new one, which downstream computations listed it as load-bearing | Permanent — the record of why every downstream recomputation happened | If a load-bearing consumer fails to recompute, the reasoning-failure retry policy applies; if retries are exhausted, that Derived Metric, Opinion, Consensus, or Decision is marked stale rather than left looking current |
+| **EvidenceChanged** | The agent that normalizes a new observation into a normalized fact superseding a prior one for the same candidate (typically Product Intelligence Agent, or the Research-layer agent that owns that fact type) | Every Signal, Derived Metric, Agent Opinion, Consensus, or Executive Decision that recorded the superseded fact version as load-bearing — each is triggered to recompute (a Signal detector re-runs; anything built on that Signal follows) | Reference to the superseded normalized fact (with its version), reference to the new one, which downstream Signals and computations listed it as load-bearing | Permanent — the record of why every downstream recomputation happened | If a load-bearing consumer fails to recompute, the reasoning-failure retry policy applies; if retries are exhausted, that Signal, Derived Metric, Opinion, Consensus, or Decision is marked stale rather than left looking current |
 | **ProviderFailed** | Any agent attempting to use a provider that errors, times out, or reveals a compliance regression | CEO Agent (health aggregation), the failing agent's own retry logic, the Escalation queue if the pattern crosses threshold | Which provider, which agent, nature of failure (transient vs. structural), timestamp | Permanent — part of that provider's reliability history, relevant to future Provider Access Spike re-verification | Triggers the transient-failure retry policy on the underlying request; repeated events for the same provider in a short window trigger escalation, not the event itself |
 | **TrendDetected** | Trend Agent | Product Intelligence Agent, Saturation Agent, Opportunity Agent | Candidate/category reference, direction, time window, confidence | Permanent — a fact about a point in time; later reads supersede it for "current" but don't erase it | Standard collection retry policy; if detection can't complete, no event fires and the gap is recorded as "not assessed," never silently absent |
 | **SupplierFound** | Supplier Agent | Margin Agent, Logistics Agent, Opportunity Agent | Candidate reference, sourcing observation reference, provider compliance classification | Permanent | Collection-level retry policy; if no match is found after retries, no event fires and the gap is explicit |
@@ -121,7 +134,10 @@ keeps forever.
   recomputed — it holds no fact that doesn't already exist, durably,
   somewhere else.
 - **Long-term Memory.** Everything durable in Atlas, composed of exactly
-  three specialized stores. Nothing is remembered long-term outside them:
+  three specialized stores. Nothing is remembered long-term outside them —
+  Signals, like Derived Metrics, Agent Opinions, Consensus, and Executive
+  Decisions, are part of a candidate's record alongside the Evidence Store
+  rather than a fourth named store; §4 defines their permanence precisely:
   - **Evidence Store.** Two things live here, under two different
     guarantees. **Raw observations** — the exact payload, source, and
     timestamp Atlas retrieved — are immutable and permanent: never edited,
@@ -153,7 +169,7 @@ keeps forever.
 
 ## 4. Decision Hierarchy
 
-Every claim inside Atlas belongs to exactly one of five layers. The layer
+Every claim inside Atlas belongs to exactly one of six layers. The layer
 determines how much it can be trusted and whether it is permanent or must
 be recomputed.
 
@@ -181,51 +197,115 @@ be recomputed.
    it never silently reuses the last stale value. Nothing above this layer
    is ever treated as more certain than the current, non-stale normalized
    facts it rests on.
-2. **Derived Metrics** — *recomputable, not permanent.* Anything
-   mechanically computed from the current normalized facts by a versioned,
-   deterministic formula — a margin range, a logistics flag drawn directly
-   from specs. Every Derived Metric records exactly which normalized-fact
-   version(s) it was computed from, not "the facts" in the abstract — given
-   the same fact versions and the same formula version, a Derived Metric
-   always reproduces identically, so it can always be thrown away and
-   rebuilt. It is kept historically because a decision was made using it,
-   not because it is itself irreplaceable. If a load-bearing fact version
-   it used is later superseded, the Derived Metric itself becomes a
-   candidate for recomputation (an `EvidenceChanged` event, §2).
-3. **Agent Opinions** — *recomputable, not permanent, always labeled.*
+2. **Signals** — *recomputable, not permanent, never an opinion.* A Signal
+   is a first-class, deterministic, versioned, reproducible object
+   representing evidence that something meaningful is happening to a
+   candidate — an Amazon rank improving, a new bestseller appearing, order
+   velocity increasing, a new advertiser detected, search demand increasing,
+   more suppliers listing the same product, a price decreasing, review
+   velocity increasing. A Signal is computed mechanically from one or more
+   normalized-fact versions (frequently by comparing a current fact to a
+   prior one to detect a pattern of change), never by an agent's judgment.
+   This layer is what makes "Atlas does not reason about providers" true in
+   practice — everything above it works from Signals, never from a
+   provider's raw payload.
+
+   - **How providers emit signals.** A provider itself never emits a
+     Signal — it only ever returns raw observations (`FOUNDATION.md` §8's
+     provider interface is unchanged by this layer). Each provider
+     integration additionally owns a **signal detector**: a specific,
+     versioned, mechanical rule that watches that provider's fact stream
+     for a defined pattern (a rank-delta threshold crossed, a new entity
+     appearing, a keyword-volume delta) and emits a standardized Signal
+     when the pattern is met. The detector is provider-specific and
+     mechanical; the Signal it emits is provider-agnostic and standardized
+     — a `RankImproving` signal looks the same regardless of which
+     marketplace's detector produced it.
+   - **How multiple providers contribute independent signals.** Two
+     different providers' detectors may each independently emit the same
+     standardized Signal type about the same candidate (an AliExpress
+     order-volume detector and a CJ Dropshipping listing-count detector
+     might both emit a demand-increasing signal). Each such emission is its
+     own distinct Signal record, citing its own facts and its own provider
+     — independent signals are never merged into a single averaged signal
+     at this layer. Corroboration across independent signals is evaluated
+     later, at Consensus, exactly as multiple independent detections
+     strengthening one another rather than one detection being duplicated.
+   - **How signals decay.** Every Signal carries its own freshness model,
+     distinct from the freshness policy governing the fact it was built
+     from. A Signal represents a detected pattern *as of* a point in time,
+     and its strength decays over a defined, versioned window even if the
+     underlying fact has not itself gone stale — "order velocity
+     increasing, detected ten days ago" carries less weight today than the
+     same detection made yesterday. A Signal that has decayed past its
+     threshold is treated as expired and stops contributing to Consensus;
+     it is never deleted, only superseded in standing, the same rule that
+     governs normalized facts.
+   - **Confidence for a signal.** A Signal's confidence is computed by a
+     versioned, deterministic formula from the strength and quality of the
+     facts it cites — the size of a rank delta, the number of corroborating
+     data points, the freshness of the underlying facts — never a
+     subjective judgment. This is confidence in the same sense a Derived
+     Metric has a value: mechanically produced, fully reproducible from the
+     same fact versions and the same formula version.
+   - **How conflicting signals coexist.** Signals that appear to point in
+     different directions about the same candidate — a price decreasing
+     alongside review velocity increasing, or a rank improving on one
+     marketplace while declining on another — are never reconciled at this
+     layer. Both persist, each independently traceable to its own facts.
+     Reconciliation, if any, happens at Consensus under the same
+     weakest-constraint and disagreement-resolution rules that already
+     govern Derived Metrics and Agent Opinions (§ below; `AGENTS.md`'s
+     disagreement-resolution rules). Signals surface disagreement; they
+     never hide it by cancelling each other out.
+3. **Derived Metrics** — *recomputable, not permanent.* Anything
+   mechanically computed from current Signals and normalized facts by a
+   versioned, deterministic formula — a margin range, a logistics flag
+   drawn directly from specs. Every Derived Metric records exactly which
+   Signal and normalized-fact version(s) it was computed from, not "the
+   facts" in the abstract — given the same input versions and the same
+   formula version, a Derived Metric always reproduces identically, so it
+   can always be thrown away and rebuilt. It is kept historically because a
+   decision was made using it, not because it is itself irreplaceable. If a
+   load-bearing fact or Signal it used is later superseded or expires, the
+   Derived Metric itself becomes a candidate for recomputation (an
+   `EvidenceChanged` event, §2).
+4. **Agent Opinions** — *recomputable, not permanent, always labeled.*
    Judgment calls that require reasoning rather than a formula —
    brandability, an unconfirmed risk flag, a positioning proposal. Always
    versioned by the model and prompt that produced them, and always records
-   which normalized-fact versions and Derived Metrics it was formed from,
-   so a later reviewer can tell whether it still reflects current facts or
-   was formed against something since superseded. Always expected to change
-   on a fresh run, and never mistaken for a Fact no matter how many times
-   it's repeated.
-4. **Consensus** — *recomputable.* The point where Derived Metrics and
-   Agent Opinions are reconciled under the weakest-constraint rule and any
-   standing veto (`AGENTS.md`'s Risk Agent authority) into one coherent
-   evidentiary position for a candidate. Consensus records the specific
-   Derived Metrics and Agent Opinions — and, transitively, the fact
-   versions beneath them — it reconciled; a Consensus formed on stale
-   inputs is itself flagged stale, never presented as current. Consensus is
-   not yet a decision — it is what the Opportunity Agent works from before
-   a verdict is drawn.
-5. **Executive Decision** — *permanent as history, never permanent as
+   which Signals, normalized-fact versions, and Derived Metrics it was
+   formed from, so a later reviewer can tell whether it still reflects
+   current evidence or was formed against something since superseded or
+   expired. Always expected to change on a fresh run, and never mistaken
+   for a Fact or a Signal no matter how many times it's repeated.
+5. **Consensus** — *recomputable.* The point where Signals, Derived
+   Metrics, and Agent Opinions are reconciled under the weakest-constraint
+   rule and any standing veto (`AGENTS.md`'s Risk Agent authority) into one
+   coherent evidentiary position for a candidate — including reconciling
+   any conflicting Signals left unresolved by layer 2. Consensus records
+   the specific Signals, Derived Metrics, and Agent Opinions — and,
+   transitively, the fact versions beneath them — it reconciled; a
+   Consensus formed on stale or expired inputs is itself flagged stale,
+   never presented as current. Consensus is not yet a decision — it is
+   what the Opportunity Agent works from before a verdict is drawn.
+6. **Executive Decision** — *permanent as history, never permanent as
    current truth.* The audited verdict that reaches the CEO Agent and,
    eventually, Ahmed. It records the exact Consensus — and, transitively,
-   every fact version — it was based on. Once made, it is recorded forever
-   in Decision History — it is never erased or edited. But it is not
-   eternal guidance: new or superseding facts produce a new Executive
-   Decision alongside it, citing newer fact versions, never a rewrite of
-   the old one.
+   every Signal and fact version — it was based on. Once made, it is
+   recorded forever in Decision History — it is never erased or edited.
+   But it is not eternal guidance: new or superseding facts and Signals
+   produce a new Executive Decision alongside it, citing newer versions,
+   never a rewrite of the old one.
 
 The distinction to hold onto: **raw observations are permanent as truth and
-never expire. Normalized facts, and everything built on them, are permanent
-only as history** — the record of what was believed, from which fact
-version, and when, stays forever, but *current truth* at any layer is
-always just the newest, non-stale normalized fact (or the metric, opinion,
-consensus, or decision built from it) — never a fact that has quietly gone
-stale and kept being relied on as if it hadn't.
+never expire. Normalized facts, Signals, and everything built on them, are
+permanent only as history** — the record of what was believed, from which
+fact and Signal version, and when, stays forever, but *current truth* at
+any layer is always just the newest, non-stale normalized fact, the newest,
+non-expired Signal (or the metric, opinion, consensus, or decision built
+from them) — never a fact that has quietly gone stale, or a Signal that has
+quietly decayed, and kept being relied on as if it hadn't.
 
 ---
 
@@ -237,10 +317,18 @@ No single mechanism prevents fabrication — a stack of them does:
   a source cannot become a Fact; a claim without a citation cannot leave any
   agent. This is structural, not a matter of agent discipline.
 - **Every output is labeled by layer.** A consumer — another agent, the
-  Auditor, Ahmed — always knows whether it's looking at a Fact, a Derived
-  Metric, an Agent Opinion, Consensus, or an Executive Decision. A
+  Auditor, Ahmed — always knows whether it's looking at a Fact, a Signal, a
+  Derived Metric, an Agent Opinion, Consensus, or an Executive Decision. A
   hallucination has nowhere to hide as a fact, because facts are the one
   layer with the narrowest, most mechanical path into existence.
+- **Signals cannot be hallucinated, only wrong by formula.** A Signal is
+  produced by a versioned, deterministic detector, never by an agent's
+  judgment — there is no reasoning step where a Signal could be invented,
+  only a bug in the detector's formula, which is versioned and auditable
+  exactly like a Derived Metric's. This is the reason Analysis and Decision
+  agents reason over Signals rather than raw provider data: it removes an
+  entire category of interpretive error before an agent ever sees the
+  evidence.
 - **Audit is independent, not self-attested.** The Auditor Agent re-checks
   citations against the underlying Evidence Store itself — it does not
   trust the Opportunity Agent's description of what the evidence says.
@@ -300,6 +388,13 @@ Atlas grow more sophisticated without ever needing a redesign:
   `CompetitionUpdated` reacts to the event and the referenced observation,
   never to whether Competition Agent used a hand-written parser or an LLM
   to interpret marketplace listings.
+- Signal detectors follow the identical path: a detector starts as a simple
+  threshold rule and can later be replaced by a more sophisticated
+  deterministic formula (never by an agent's judgment — a detector that
+  starts reasoning rather than computing has become an Agent Opinion, not a
+  Signal, and must be relabeled honestly, same as any other layer shift in
+  this document). Either way, it is versioned exactly like a Derived
+  Metric's formula, with the same upgrade and rollback mechanism.
 - What never changes as reasoning grows more capable: the duty to cite
   evidence, to label confidence honestly, and to never claim more certainty
   than the evidence itself supports. The reasoning method is swappable. The
@@ -315,7 +410,11 @@ interface, registered under its own key, gated by the Provider Access Spike
 classification before anything may rely on it. A new provider feeding
 Supplier Agent doesn't create a new event type — it produces more
 `SupplierFound` events with a different source citation. No existing
-provider or agent needs to change.
+provider or agent needs to change. If the new provider's facts warrant
+detecting a pattern of change, it brings its own signal detector emitting
+Signal types the organization already knows how to consume (§4) — a new
+detector is additive in exactly the same way a new provider is; it never
+requires an existing Analysis or Decision agent to change how it reasons.
 
 **New agents** are added the same additive way, because agents only ever
 communicate through events and shared memory, never directly:
@@ -353,8 +452,9 @@ which other specific agents happen to exist today.
 ## 8. What "Autonomous" Means Inside Atlas
 
 **Autonomous** means Atlas can complete the full lifecycle of work — idea →
-observation → fact → knowledge → decision — for a given day without a human
-needing to initiate, guide, or unblock any step of that loop.
+observation → fact → signal → knowledge → decision — for a given day
+without a human needing to initiate, guide, or unblock any step of that
+loop.
 
 It does **not** mean Atlas acts on its decisions without oversight, and it
 does **not** mean Atlas is exempt from anything in this document or in
@@ -384,31 +484,40 @@ a human," and Atlas's autonomy is only ever the first.
 4. "Current truth" for any time-sensitive fact is always the newest valid,
    non-stale normalized fact under an explicit freshness policy — never a
    stale fact kept in use because nothing newer has arrived.
-5. Every Derived Metric, Agent Opinion, Consensus, and Executive Decision
-   must record the specific fact version(s) it was built from.
-6. A superseded load-bearing fact triggers recomputation of everything
-   downstream that used it — or, if recomputation fails, an explicit
-   staleness marking, never silence.
-7. No agent communicates outside the event system and shared memory — there
+5. Every Signal, Derived Metric, Agent Opinion, Consensus, and Executive
+   Decision must record the specific fact and Signal version(s) it was
+   built from.
+6. A superseded load-bearing fact or an expired load-bearing Signal
+   triggers recomputation of everything downstream that used it — or, if
+   recomputation fails, an explicit staleness marking, never silence.
+7. No agent reasons directly over a provider's raw data. Discovery- and
+   Research-layer agents emit Signals from facts; every Analysis- and
+   Decision-layer agent, including the Opportunity Agent, consumes only
+   Signals and the facts they cite.
+8. A Signal is always deterministic, versioned, and reproducible from the
+   facts it cites — produced by a detector's formula, never by an agent's
+   judgment. Conflicting Signals about the same candidate coexist; they are
+   never reconciled or cancelled out at the Signal layer itself.
+9. No agent communicates outside the event system and shared memory — there
    is no private, off-record coordination between agents.
-8. No confidence claim exceeds the confidence of its weakest load-bearing
-   input.
-9. No provider is used outside its current Provider Access Spike
-   classification.
-10. "I don't know" is always an available, unpenalized output at every
-    layer, for every agent — including when every fact on record for a
-    claim has gone stale.
-11. Swapping deterministic logic for AI-assisted reasoning inside an agent
+10. No confidence claim exceeds the confidence of its weakest load-bearing
+    input.
+11. No provider is used outside its current Provider Access Spike
+    classification.
+12. "I don't know" is always an available, unpenalized output at every
+    layer, for every agent — including when every fact or Signal on record
+    for a claim has gone stale or expired.
+13. Swapping deterministic logic for AI-assisted reasoning inside an agent
     requires a version bump, never an architecture change.
-12. Adding a new provider or a new agent requires only an additive
+14. Adding a new provider or a new agent requires only an additive
     extension — never a modification to an existing agent's or provider's
     contract.
-13. No autonomous action crosses from research-and-decision into money
+15. No autonomous action crosses from research-and-decision into money
     movement or third-party representation without an explicit amendment
     to `AGENTS.md` by Ahmed.
-14. Autonomy expands only on an observed track record recorded in Decision
+16. Autonomy expands only on an observed track record recorded in Decision
     History — never on a calendar.
-15. Every escalation states what is uncertain and what the system would do
+17. Every escalation states what is uncertain and what the system would do
     about it, without doing it.
 
 ---

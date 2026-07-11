@@ -170,6 +170,8 @@ Rules enforced in code, not just convention:
 - The LLM prompt contains **only** serialized evidence from the DB — never asked to "estimate" a number the system didn't collect. The structured output schema has no free-numeric fields; any metric it mentions must reference an evidence ID, and responses failing validation are rejected and retried once, then flagged.
 - API responses tag every field with its layer, so the future dashboard can visually separate fact from opinion.
 
+**A note on Signals.** Between layer 2 (normalized product) and layer 3 (calculated score), Atlas recognizes an intermediate concept: a **Signal** — a deterministic, versioned, reproducible detection that something meaningful is happening to a candidate (a rank improving, order velocity increasing, a new advertiser appearing), computed mechanically from normalized facts, never an opinion. Signals are the interface between raw provider-specific data and everything that reasons about a candidate — no agent or score reasons directly over a provider's raw payload. This is a refinement of layer 3, not a new numbered layer here; the full definition (production, decay, confidence, coexistence of conflicting signals, and how the Opportunity Agent consumes them) lives in `OPERATING_SYSTEM.md` §4, which this table defers to.
+
 ## 8. Source-provider interface design
 
 One narrow interface per *capability*, not one giant interface per website. A provider implements the capabilities it can serve. Written as Python `Protocol`s with Pydantic DTOs (illustrative — final signatures at implementation time):

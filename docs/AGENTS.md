@@ -56,6 +56,14 @@ dependency-ordered steps FOUNDATION.md already establishes.
 7. **This constitution can only be amended by Ahmed.** If an implementation
    detail ever conflicts with a clause here, this document wins until Ahmed
    changes it.
+8. **Agents reason over Signals, never raw provider data.** Discovery- and
+   Research-layer agents establish facts and, from them, emit Signals —
+   deterministic, versioned detections that something meaningful is
+   happening (a rank improving, order velocity increasing, a new advertiser
+   appearing). Analysis- and Decision-layer agents, including the
+   Opportunity Agent, consume Signals and the facts they cite — never a
+   provider's raw payload directly. Full mechanics are defined in
+   `OPERATING_SYSTEM.md` §4.
 
 ---
 
@@ -602,14 +610,16 @@ influence whether Atlas recommends launching.*
   plain-language rationale citing specific evidence for every claim;
   incorporate Marketing-layer proposals as context, never as decision
   inputs.
-- **Inputs.** All Research and Analysis layer outputs for the candidate;
-  Marketing layer proposals, informational only.
+- **Inputs.** Signals and Derived Metrics/Opinions produced by the Research
+  and Analysis layers for the candidate (see `OPERATING_SYSTEM.md` §4) —
+  never a provider's raw data directly; Marketing layer proposals,
+  informational only.
 - **Outputs.** A verdict, confidence, and cited rationale — the AI
   conclusion for this candidate, always clearly separated from the facts
   and scores beneath it.
-- **Evidence it is allowed to use.** Only what Research and Analysis agents
-  actually produced and cited for this candidate — it introduces no new fact
-  of its own.
+- **Evidence it is allowed to use.** Only Signals, facts, and Analysis-layer
+  outputs actually produced and cited for this candidate — it introduces no
+  new fact of its own and never queries a provider itself.
 - **Evidence it must never invent.** Any metric, quote, or claim not already
   present in an upstream agent's cited output. It never resolves a
   disagreement between agents by silently picking a side.
@@ -678,6 +688,32 @@ exceptions are structural, not conversational: the Risk Agent's veto signal,
 which the Opportunity Agent must observe and cannot override on its own, and
 the Auditor Agent's two fixed contacts (the Opportunity Agent's output to
 check, and the CEO Agent to report to).
+
+### The Signal boundary between providers and reasoning
+
+Atlas does not reason about providers — it reasons about Signals. Every
+Discovery- and Research-layer agent, having established a fact from a
+provider's data, is also responsible for detecting whether that fact
+represents something meaningful happening (a rank improving, a new
+bestseller appearing, more suppliers listing the same product) and emitting
+that detection as a Signal: a deterministic, versioned, reproducible object,
+never a judgment call. This is mechanical, not interpretive — the same
+discipline a Derived Metric follows, applied to detecting change rather than
+computing a value.
+
+Every Analysis- and Decision-layer agent — Margin, Brandability, Logistics,
+Saturation, Risk, and above all the Opportunity Agent — consumes Signals and
+the specific facts they cite as its working material. None of them queries
+a provider, reads a raw observation payload, or needs to know which provider
+produced a given Signal type in order to reason about it; the citation trail
+down to the originating fact and provider remains fully available for the
+Auditor Agent, but it is not part of an Analysis or Decision agent's normal
+reasoning surface. This is what keeps a new provider additive (§ below):
+it only ever needs to emit Signal types the organization already knows how
+to consume. The full definition of what a Signal is, how it decays, how its
+confidence is computed, and how conflicting Signals coexist is in
+`OPERATING_SYSTEM.md` §4 — this constitution states only who produces and
+who consumes them.
 
 ### Which agents can never communicate directly
 
