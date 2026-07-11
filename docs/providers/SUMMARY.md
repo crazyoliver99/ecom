@@ -1,7 +1,8 @@
 # Provider Access Spike — Summary & Decisions
 
-**Completed:** 2026-07-11 · **Context:** individual in Egypt, no registered company, single-user internal research tool.
-All claims are sourced in the individual records in this directory. Third-party pricing figures must be re-confirmed on vendor pages before purchase.
+**Completed:** 2026-07-11 · **Business context for planning:** target market = **United States**; legal entity = **planned US LLC** (not yet formed); operator residency = **unspecified unless explicitly provided**; use = single-user internal research tool.
+
+The system is **jurisdiction-agnostic**: records distinguish target market (drives data coverage), legal entity (drives contracts/accounts), and operator residency (drives identity verification and payment rails). Notes depending on residency or business type are flagged with: *"This may vary depending on the operator's country and legal entity."* All claims are sourced in the individual records in this directory. Third-party pricing figures must be re-confirmed on vendor pages before purchase.
 
 ## Recommendation table
 
@@ -29,7 +30,7 @@ All claims are sourced in the individual records in this directory. Third-party 
 2. **Keepa** — read the API T&C retention clause at signup, confirm current pricing, then subscribe (~€49). The retention clause is this spike's most important unverified item.
 3. **SerpApi** — free account (250 searches/mo) for trends prototyping; note DataForSEO as the production route.
 4. **AliExpress affiliate + Open Platform applications** — needs a declared promotion channel; start now, approval takes days and is discretionary.
-5. **Meta** — identity/location confirmation at facebook.com/ID (Egyptian ID; confirm it's supported — login-gated, unverified), then developer app with Ad Library API product.
+5. **Meta** — identity/location confirmation at facebook.com/ID (done with the operator's personal government ID; supported-country list is login-gated — this may vary depending on the operator's country and legal entity), then developer app with Ad Library API product.
 6. **Reddit** — create account + script app, submit the data-access request describing a single-user, read-only, low-volume research tool that summarizes but does not train on content and honors deletion syncing.
 7. **Google Trends alpha application** — free, low odds, no downside.
 8. **TikTok for Business** — free account for full Creative Center browsing.
@@ -37,10 +38,10 @@ All claims are sourced in the individual records in this directory. Third-party 
 ## Uncertainties & country/entity dependencies
 
 1. **Keepa retention clause** — unread (sandbox egress blocked keepa.com); must be read before we persist Keepa data. Mitigation: Keepa serves full history on demand, so we can store only derived metrics.
-2. **facebook.com/ID Egypt support** — high confidence (Egypt is on Meta's transparency-enforcement list) but the supported-country list is login-gated.
-3. **Reddit approval outcome** — discretionary; Reddit's purpose-based commercial definition may route us to the paid track ($0.24/1k calls).
-4. **CJ Egypt registration** — no restriction found, no explicit country list published; confirmed only by signing up. CJ API terms text also unread.
-5. **AliExpress approval** — individual-with-personal-ID is documented as workable, but acceptance requires a credible promotion channel; Egypt payout rails unconfirmed.
+2. **facebook.com/ID identity verification** — availability and accepted ID types depend on the operator's country of residence; the supported-country list is login-gated. This may vary depending on the operator's country and legal entity.
+3. **Reddit approval outcome** — discretionary; Reddit's purpose-based commercial definition may route us to the paid track ($0.24/1k calls) regardless of entity status.
+4. **CJ registration acceptance** — no restriction found, no explicit country list published; confirmed only by signing up. CJ API terms text also unread. This may vary depending on the operator's country and legal entity.
+5. **AliExpress approval** — individuals (personal ID) and registered entities (business license) are both documented paths, but acceptance requires a credible promotion channel; payout rails vary by country. This may vary depending on the operator's country and legal entity.
 6. **All third-party pricing** (Keepa tiers, StoreLeads, PiPiAds, BigSpy, Minea, Rainforest) — sourced from trackers/reviews because vendor pages were unreachable from the research sandbox; confirm before paying.
 7. **TikTok Commercial Content API** — application outcome unknowable without applying, but the dataset is EU-only regardless, so our classification doesn't depend on it.
 

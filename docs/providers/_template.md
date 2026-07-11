@@ -4,8 +4,18 @@
 |---|---|
 | **Capability** | <which system capability this serves, e.g. "Meta ad intelligence"> |
 | **Verified on** | <YYYY-MM-DD — the date every claim below was checked against live sources> |
-| **Context assumed** | <country of residence, entity status, intended use — classifications may differ for other contexts> |
+| **Target market** | <market whose data we need, e.g. United States> |
+| **Legal entity** | <the entity that will hold accounts/contracts, e.g. planned US LLC> |
+| **Operator residency** | <country of the person operating the tool; "unspecified" is valid> |
+| **Use** | <e.g. single-user internal research tool> |
 | **Final classification** | `usable_now` / `needs_approval` / `paid_option` / `manual_only` / `blocked` |
+
+> The system is jurisdiction-agnostic. Keep these three dimensions distinct —
+> providers gate on them differently (data coverage follows *target market*;
+> account eligibility follows *entity* and/or *operator residency*). Any note
+> that depends on residency or business type must state: **"This may vary
+> depending on the operator's country and legal entity."** Name a specific
+> country only when it is explicitly part of the provider's own policy.
 
 > Every factual claim in this record must cite the source URL it was verified
 > at. "Unknown, because <reason>" is an acceptable answer; an empty field is

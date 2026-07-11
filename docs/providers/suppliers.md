@@ -4,7 +4,10 @@
 |---|---|
 | **Capability** | Supplier data — product cost, shipping options/times, stock, for margin & shipping-difficulty estimates |
 | **Verified on** | 2026-07-11 |
-| **Context assumed** | Individual in Egypt, no registered company, single-user internal research tool |
+| **Target market** | United States |
+| **Legal entity** | Planned US LLC (not yet formed) |
+| **Operator residency** | Unspecified — notes that depend on it are flagged |
+| **Use** | Single-user internal research tool |
 | **Final classification** | CJ Dropshipping: `usable_now` · AliExpress affiliate API: `needs_approval` · Alibaba.com: `manual_only` |
 
 ## 1. Official documentation
@@ -16,13 +19,13 @@
 
 ## 2. Access & approval requirements
 
-- **CJ: self-serve, no approval.** Free account (email signup, no card, no business registration); API key self-generated in the dashboard (My CJ → Authorization → API). No Egypt restriction found; CJ positions itself "worldwide to worldwide" — though no explicit supported-country list is published, so treat Egypt acceptance as high-probability, confirmed at signup.
-- **AliExpress: two human-review gates.** (1) Affiliate program acceptance — requires declaring a promotion channel (website/social/YouTube), review takes days; (2) Open Platform app approval (~1–2 business days) — individuals can upload personal ID where a business license is requested. Open internationally; no Egypt exclusion found but not explicitly confirmed. The deeper `aliexpress.ds.*` API tier needs seller-center registration + endpoint whitelisting (heavier `needs_approval`).
+- **CJ: self-serve, no approval.** Free account (email signup, no card, no business registration); API key self-generated in the dashboard (My CJ → Authorization → API). No country restriction found; CJ positions itself "worldwide to worldwide" — though no explicit supported-country list is published, so confirm at signup. This may vary depending on the operator's country and legal entity.
+- **AliExpress: two human-review gates.** (1) Affiliate program acceptance — requires declaring a promotion channel (website/social/YouTube), review takes days; (2) Open Platform app approval (~1–2 business days) — individuals can upload personal ID where a business license is requested, and a registered entity (e.g. a US LLC) can apply as a business. Open internationally; no country exclusion found but not explicitly confirmed — this may vary depending on the operator's country and legal entity. The deeper `aliexpress.ds.*` API tier needs seller-center registration + endpoint whitelisting (heavier `needs_approval`).
 - **Alibaba.com:** developer registration open, but the API surface is ISV/seller-transaction oriented; no verifiable open product-search API for non-partners.
 
 ## 3. Geographic & dataset coverage
 
-- **CJ:** millions of SKUs with per-variant warehouse locations (China + overseas); `freightCalculate` quotes arbitrary origin→destination country pairs — so shipping cost/time to **any customer market** (US, EU, GCC, EG) is directly queryable. Products include price, variants, stock, `listedNum` (how many stores list it — a demand proxy).
+- **CJ:** millions of SKUs with per-variant warehouse locations (China + overseas); `freightCalculate` quotes arbitrary origin→destination country pairs — so shipping cost/time to **any customer market** — including the US target market — is directly queryable. Products include price, variants, stock, `listedNum` (how many stores list it — a demand proxy).
 - **AliExpress affiliate:** the affiliate-promotable AliExpress catalog; `aliexpress.affiliate.product.query` supports `ship_to_country`, `delivery_days`, currency/language targeting — and returns `lastest_volume` (recent orders count), the single best free demand signal in this whole spike.
 - **Alibaba.com:** B2B wholesale; effectively manual browsing for us.
 
@@ -90,4 +93,4 @@ Success: search returns products with prices; freight returns `[{logisticName, l
 - <https://apitracker.io/a/spocket-co> — no verifiable Spocket developer docs
 - <https://apify.com/muhammetakkurtt/cj-dropshipping-scraper/api>, <https://rapidapi.com/georgekhananaev/api/aliexpress-true-api> — third-party scraper stopgaps
 
-**Country/entity dependencies:** CJ — individual OK, Egypt not explicitly listed (confirm at signup). AliExpress — individual OK via personal ID, approval discretionary, needs a promotion channel; confirm Egypt payout rails at signup. Alibaba — ISV/seller-oriented.
+**Country/entity dependencies:** CJ — individuals accepted, no country list published (confirm at signup). AliExpress — individuals accepted via personal ID and entities via business registration; approval discretionary; needs a promotion channel; affiliate payout rails vary by country. Both: this may vary depending on the operator's country and legal entity. Alibaba — ISV/seller-oriented.

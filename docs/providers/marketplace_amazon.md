@@ -4,7 +4,10 @@
 |---|---|
 | **Capability** | Marketplace data — prices, review counts/ratings, sales-rank history as demand/competition proxies |
 | **Verified on** | 2026-07-11 |
-| **Context assumed** | Individual in Egypt, no registered company, single-user internal research tool |
+| **Target market** | United States |
+| **Legal entity** | Planned US LLC (not yet formed) |
+| **Operator residency** | Unspecified — notes that depend on it are flagged |
+| **Use** | Single-user internal research tool |
 | **Final classification** | `paid_option` via **Keepa** · PA-API 5.0: `blocked` (retired) · Creators API: `blocked` for us · SP-API: not applicable |
 
 ## Headline finding
@@ -21,17 +24,17 @@
 
 ## 2. Access & approval requirements
 
-- **Keepa: self-serve.** Monthly subscription + access key; no approval, no affiliate status, no entity requirement referenced anywhere public. No Egypt restriction found — though keepa.com's own terms were not directly readable from the research sandbox, so confirm at signup. EUR card billing.
+- **Keepa: self-serve.** Monthly subscription + access key; no approval, no affiliate status, no entity requirement referenced anywhere public. No country restriction found — though keepa.com's own terms were not directly readable from the research sandbox, so confirm at signup; this may vary depending on the operator's country and legal entity. EUR card billing.
 - **PA-API 5.0: blocked for everyone** (retired; no new customers).
-- **Creators API: blocked for us.** Needs an approved Associates account + the 10-sales/30-day/locale threshold (figure consistent across three independent integrator docs; not read on Amazon's own page — flagged). Also: amazon.eg Associates is invitation-only; an Egyptian individual *can* join amazon.com Associates (international payouts by bank transfer/check/gift card) — but that's moot given the sales threshold.
+- **Creators API: blocked for us.** Needs an approved Associates account + the 10-sales/30-day/locale threshold (figure consistent across three independent integrator docs; not read on Amazon's own page — flagged). Associates enrollment and payout mechanics vary by marketplace and by the operator's country and legal entity (some countries' local Associates programs are invitation-only; a US LLC can join amazon.com Associates directly) — but that's moot given the sales threshold: a tool that drives no affiliate traffic can never sustain it.
 - **Rainforest: self-serve**, 100-request free trial, no card, no entity requirement stated.
 - **SP-API: not applicable** — requires a Professional Amazon selling account (or vetted solution-provider status) and exposes sellers' operational data, not market research for arbitrary products.
 
 ## 3. Geographic & dataset coverage
 
-- **Keepa: 11 locales — US, UK, DE, FR, JP, CA, IT, ES, IN, MX, BR** (verified in the official client's locale enum). **No amazon.eg.** Per product: full price history (all price types), **sales-rank history**, buy box, **rating & review-count history**, offers, sellers, categories, deals, best-sellers, and a Product Finder query engine. Keepa is the only source with *native history* — Amazon's own APIs never exposed sales-rank history.
+- **Keepa: 11 locales — US, UK, DE, FR, JP, CA, IT, ES, IN, MX, BR** (verified in the official client's locale enum) — **the US target market (amazon.com, `domain=1`) is covered.** Per product: full price history (all price types), **sales-rank history**, buy box, **rating & review-count history**, offers, sellers, categories, deals, best-sellers, and a Product Finder query engine. Keepa is the only source with *native history* — Amazon's own APIs never exposed sales-rank history.
 - **Creators API:** live data only, same-marketplace-as-PA-API model; irrelevant given the gate.
-- **Rainforest: 24 Amazon domains including amazon.eg**; product/search/offers/reviews/bestsellers/categories/sellers request types; live-scraped (history only by polling).
+- **Rainforest: 24 Amazon domains** (more than Keepa's 11 — relevant only if a locale outside Keepa's coverage ever matters); product/search/offers/reviews/bestsellers/categories/sellers request types; live-scraped (history only by polling).
 
 ## 4. Pricing & rate limits
 
@@ -48,7 +51,7 @@
 ## 6. Arbitrary ecommerce product search?
 
 - **Keepa: yes** — keyword `search`, catalog-wide `query` (Product Finder: filter by rank/price/review criteria), `product` by ASIN/UPC/EAN, best-sellers — across its 11 locales.
-- **Rainforest: yes** — any keyword/ASIN across 24 domains incl. amazon.eg.
+- **Rainforest: yes** — any keyword/ASIN across its 24 domains.
 - **Creators API: technically yes, practically no** (gate).
 
 ## 7. Minimal test request
@@ -66,14 +69,14 @@ Success: `products[0].csv` history arrays (prices, sales rank), stats, review hi
 
 ## 8. Fallback options
 
-1. **Rainforest API** — covers amazon.eg, scraper-class caveats above.
+1. **Rainforest API** — broader locale coverage; scraper-class caveats above.
 2. **SerpApi / Oxylabs Amazon endpoints** — same class, unverified in detail.
 3. **Keepa website manually** (€19/mo consumer subscription) — if API terms disappoint, manual chart reading + manual evidence entry still works.
 4. **Creators API later** — only if you ever become an active Associate with ≥10 monthly qualified sales per locale.
 
 ## 9. Final classification & rationale
 
-**`paid_option` via Keepa (~€49/mo)** — self-serve for an Egyptian individual, no approval gate, and the only source of native price/sales-rank/review *history*, which is exactly the demand/competition proxy the scoring engine needs. Caveats: read the retention clause at signup, and accept that research covers US/EU/major marketplaces, not amazon.eg (Rainforest is the fallback if amazon.eg data ever becomes essential). PA-API is dead; Creators API and SP-API are structurally unavailable to a non-selling, non-affiliate research tool.
+**`paid_option` via Keepa (~€49/mo)** — self-serve with no approval gate and no documented country/entity requirement (this may vary depending on the operator's country and legal entity; confirm at signup), and the only source of native price/sales-rank/review *history*, which is exactly the demand/competition proxy the scoring engine needs. It covers the US target market plus ten other major marketplaces (Rainforest is the fallback if a locale outside Keepa's coverage ever becomes essential). Caveat: read the retention clause at signup. PA-API is dead; Creators API and SP-API are structurally unavailable to a non-selling, non-affiliate research tool.
 
 ## Sources
 
@@ -84,7 +87,7 @@ Success: `products[0].csv` history arrays (prices, sales rank), stats, review hi
 - <https://affiliate-program.amazon.com/creatorsapi/docs/en-us/introduction> — Creators API (proxy-blocked; eligibility corroborated by integrators)
 - <https://getaawp.com/docs/article/amazon-creators-api/>, <https://www.keywordrush.com/blog/amazon-pa-api-associatenoteligible-error-is-there-a-new-10-sales-rule/>, <https://guides.freshstore.com/article/745-amazon-creators-api> — 10-sales/30-day threshold (three independent integrators; not read on Amazon's page)
 - <https://dev.to/th3nate/amazon-pa-api-v5-is-shutting-down-april-30-2026-here-is-what-changes-at-the-auth-layer-22ek> — deprecation/retirement dates
-- <https://geniuslink.com/blog/amazon-associates-egypt/> — amazon.eg Associates invitation-only
+- <https://geniuslink.com/blog/amazon-associates-egypt/> — example that some countries' local Associates programs are invitation-only (enrollment varies by marketplace)
 - <https://affiliate-program.amazon.com/resource-center/receive-your-international-affiliate-earnings-in-your-local-bank/> — international Associates payouts
 - <https://keepa.com/#!discuss/t/how-our-api-plans-work/410> — official token-plan explanation
 - <https://fbamultitool.com/keepa-subscription-pricing-quick-guide-for-amazon-sellers/>, <https://revenuegeeks.com/keepa-pricing/> — Keepa tier prices (third-party; confirm at signup)

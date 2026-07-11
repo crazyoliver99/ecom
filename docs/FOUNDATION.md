@@ -241,6 +241,7 @@ No real external provider gets implemented — not even a prototype — until it
 
 Rules:
 
+- **The system is jurisdiction-agnostic.** Spike records must distinguish three dimensions that providers gate on differently: **target market** (drives which data we need), **legal business entity** (drives accounts/contracts), and **operator residency** (drives identity verification and payment rails). Any note that depends on residency or business type must state: *"This may vary depending on the operator's country and legal entity."* No country is assumed unless it is explicitly part of a provider's own policy. Current planning context: target market = United States; planned entity = US LLC; operator residency = unspecified unless explicitly provided.
 - A provider adapter may only be built for a source whose spike record concludes `usable` or an accepted `paid_option`.
 - `blocked` or unresolved sources fall back to the manual provider, and reports show that signal as unavailable — the system stays honest rather than assuming access.
 - Spike records are re-checked when a provider errors persistently (API terms and access programs change).

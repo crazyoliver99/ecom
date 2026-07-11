@@ -4,7 +4,10 @@
 |---|---|
 | **Capability** | Community signals — mentions, complaints, interest around product categories |
 | **Verified on** | 2026-07-11 |
-| **Context assumed** | Individual in Egypt, no registered company, single-user internal research tool |
+| **Target market** | United States |
+| **Legal entity** | Planned US LLC (not yet formed) |
+| **Operator residency** | Unspecified — notes that depend on it are flagged |
+| **Use** | Single-user internal research tool |
 | **Final classification** | `needs_approval` (manual browsing + manual evidence is the guaranteed floor) |
 
 ## 1. Official documentation
@@ -18,11 +21,11 @@
 
 ## 2. Access & approval requirements
 
-Mechanics: Reddit account → create an app at `/prefs/apps` (client ID + secret) → OAuth2. No payment, no company. **But since 2025–26, Reddit's Responsible Builder Policy requires explicit prior approval via a request form before any API data access** — self-service access is gone. Reddit's App Review decides commercial vs non-commercial treatment, and its commercial definition ("by a business **or on behalf of a business** or as part of a monetized product or service") plausibly captures product research for a for-profit ecommerce venture even without a registered company — honest disclosure may route to the paid/contract track. **Egypt:** no country restriction found anywhere, but the Developer Terms text (age/sanctions clauses) could not be read directly — unverified, with nothing contrary reported.
+Mechanics: Reddit account → create an app at `/prefs/apps` (client ID + secret) → OAuth2. No payment, no company. **But since 2025–26, Reddit's Responsible Builder Policy requires explicit prior approval via a request form before any API data access** — self-service access is gone. Reddit's App Review decides commercial vs non-commercial treatment, and its commercial definition ("by a business **or on behalf of a business** or as part of a monetized product or service") plausibly captures product research for a for-profit ecommerce venture — the definition is purpose-based, so it applies whether or not a legal entity exists yet — and honest disclosure may route to the paid/contract track. **Operator residency:** no country restriction found anywhere, but the Developer Terms text (age/sanctions/eligibility clauses) could not be read directly — unverified. This may vary depending on the operator's country and legal entity.
 
 ## 3. Geographic & dataset coverage
 
-Global dataset regardless of caller location. Relevance caveat (judgment, not doc claim): Reddit skews English/US-EU — thin for Egypt/MENA niches, strong for global English-language product-category demand and pain points. Listings capped ~1,000 items; keyword search reaches older posts; bulk/historical (Pushshift) is now moderators-only.
+Global dataset regardless of caller location. Relevance note (judgment, not doc claim): Reddit skews English/US-EU — well matched to a US target market for product-category demand and pain-point signals. Listings capped ~1,000 items; keyword search reaches older posts; bulk/historical (Pushshift) is now moderators-only.
 
 ## 4. Pricing & rate limits
 
@@ -74,4 +77,4 @@ The unauthenticated probe was blocked by the research sandbox's own egress proxy
 - <https://support.reddithelp.com/hc/en-us/articles/16470271632404-Pushshift-Access-Request>, <https://support.reddithelp.com/hc/en-us/articles/49381918834964-Reddit-for-Researchers-Program> — restricted programs
 - <https://www.socialcrawl.dev/blog/reddit-data-api-2026>, <https://www.redditapis.com/blogs/reddit-data-api-2026> — approval-gate reports (vendor blogs, low confidence)
 
-**Country/entity dependencies:** none found; the entity-relevant trigger is Reddit's *purpose-based* commercial definition, not business registration. Developer Terms eligibility text unverified (site unreachable from research sandbox).
+**Country/entity dependencies:** none found; the entity-relevant trigger is Reddit's *purpose-based* commercial definition, not business registration. Developer Terms eligibility text unverified (site unreachable from research sandbox) — this may vary depending on the operator's country and legal entity.

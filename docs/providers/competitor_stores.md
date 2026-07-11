@@ -4,7 +4,10 @@
 |---|---|
 | **Capability** | Competitor-store analysis (what a Shopify/WooCommerce store sells, prices, how established it is) |
 | **Verified on** | 2026-07-11 |
-| **Context assumed** | Individual in Egypt, no registered company, single-user internal research tool |
+| **Target market** | United States |
+| **Legal entity** | Planned US LLC (not yet formed) |
+| **Operator residency** | Unspecified — notes that depend on it are flagged |
+| **Use** | Single-user internal research tool |
 | **Final classification** | `paid_option` for systematic data (StoreLeads-class); `manual_only` floor is usable now at $0. **Automated storefront scraping: blocked by policy.** |
 
 ## 1. Official documentation
@@ -20,12 +23,12 @@
 
 - **Scraping Shopify storefronts (incl. `/products.json`): no permitted route exists.** Shopify's API Terms prohibit "copy, scrape, mine, or create derivative works of … any Merchant Store … except as authorized by Shopify in writing", and the standard store-level ToS template used by most stores prohibits "spider, crawl, or scrape" (e.g. <https://shopify.supply/terms-of-service>). Technical availability of the endpoint does not create permission.
 - **WooCommerce:** self-hosted; the individual store's terms govern. Our policy treats "no explicit permission" conservatively — same rules.
-- **StoreLeads / Wappalyzer / SimilarWeb / BuiltWith:** self-serve signup, email + card, no company registration, no approval — open to an Egyptian individual.
+- **StoreLeads / Wappalyzer / SimilarWeb / BuiltWith:** self-serve signup, email + card, no company registration, no approval. This may vary depending on the operator's country and legal entity.
 - **Meta Ad Library web UI:** free, no login, covers commercial ads globally — a legitimate cross-reference for a competitor's ad footprint.
 
 ## 3. Geographic & dataset coverage
 
-- **StoreLeads:** ~13.6M active stores across 408 platforms (Shopify, WooCommerce, Square Online, …). Explicit Egypt coverage (its public reports count ~7,381 Shopify stores in Cairo, 1,662 Giza, 776 Alexandria — <https://storeleads.app/reports/shopify/EG/top-stores>). Per-store: platform, installed apps and technologies with install dates, traffic estimates, estimated monthly sales (modeled), ship-to countries, ~60 filters.
+- **StoreLeads:** ~13.6M active stores across 408 platforms (Shopify, WooCommerce, Square Online, …), global coverage with public per-country reports (the per-country report pattern was verified via <https://storeleads.app/reports/shopify/EG/top-stores>; the US target market's report is expected at the analogous `/US/` URL — confirm during the test plan). Per-store: platform, installed apps and technologies with install dates, traffic estimates, estimated monthly sales (modeled), ship-to countries, ~60 filters.
 - **BuiltWith / Wappalyzer:** tech detection on any public domain, any country.
 - **SimilarWeb:** global traffic estimates, but 30–50% error reported for sites under ~100k monthly visits — many small competitor stores fall below reliable thresholds.
 
@@ -55,9 +58,9 @@ Yes, through three compliant lenses: (1) licensed store-intelligence lookups (St
 
 ## 7. Minimal test request
 
-The one allowed no-credential probe (fetching StoreLeads' public Egypt report) was blocked by the research sandbox's own egress proxy, not by the vendor — **re-run from a normal machine**:
+The one allowed no-credential probe (fetching a StoreLeads public per-country report) was blocked by the research sandbox's own egress proxy, not by the vendor — **re-run from a normal machine**:
 
-1. Open `https://storeleads.app/reports/shopify/EG/top-stores` — confirm public report quality (no account needed).
+1. Open `https://storeleads.app/reports/shopify/US/top-stores` (the target market's report) — confirm public report quality (no account needed).
 2. StoreLeads trial/Premium: look up 3 known competitor domains; success = ≥2 found with sales + traffic estimates populated.
 3. Wappalyzer free tier: same 3 domains, verify platform/app detection.
 4. SimilarWeb free lookup: same domains; "insufficient data" for small stores is a finding, not a failure.
@@ -73,7 +76,7 @@ The one allowed no-credential probe (fetching StoreLeads' public Egypt report) w
 
 ## 9. Final classification & rationale
 
-**`paid_option`** for systematic competitor data (StoreLeads Pro when volume justifies it), with a **`manual_only` floor that is usable now at $0**. Automated storefront scraping is **blocked by policy** regardless of technical feasibility: Shopify's platform terms and near-universal store ToS prohibit it, and the hiQ v. LinkedIn endgame (breach-of-contract consent judgment, injunction, data destruction — <https://www.zwillgen.com/alternative-data/hiq-v-linkedin-wrapped-up-web-scraping-lessons-learned/>) shows "public" does not mean "permitted"; an Egypt-based individual has no practical litigation shield. 
+**`paid_option`** for systematic competitor data (StoreLeads Pro when volume justifies it), with a **`manual_only` floor that is usable now at $0**. Automated storefront scraping is **blocked by policy** regardless of technical feasibility: Shopify's platform terms and near-universal store ToS prohibit it, and the hiQ v. LinkedIn endgame (breach-of-contract consent judgment, injunction, data destruction — <https://www.zwillgen.com/alternative-data/hiq-v-linkedin-wrapped-up-web-scraping-lessons-learned/>) shows "public" does not mean "permitted"; litigation exposure varies with the operator's country and legal entity, and our stance is ToS-respecting regardless of jurisdiction. 
 
 ### Policy (adopted with this record)
 
@@ -90,7 +93,7 @@ The one allowed no-credential probe (fetching StoreLeads' public Egypt report) w
 - <https://shopify.supply/terms-of-service>, <https://mxwraps.us/policies/terms-of-service> — standard store ToS template: "spider, crawl, or scrape" prohibited
 - <https://shopify.dev/docs/storefronts/themes/seo/robots-txt>, <https://logeix.com/shopify-seo/robots-txt> — default robots.txt scope (crawl management, not permission)
 - <https://community.shopify.com/t/how-to-paginate-or-get-a-list-of-all-products-using-domain-com-products-json/99991>, <https://dev.to/dentedlogic/the-shopify-productsjson-trick-scrape-any-store-25x-faster-with-python-4p95>, <https://tendem.ai/blog/scraping-shopify-stores-product-catalogs> — /products.json technical behavior + Cloudflare bot protection (capability evidence only)
-- <https://storeleads.app/>, <https://storeleads.app/help/faq/what-data-is-available-for-domains>, <https://storeleads.app/help/faq/how-is-estimated-sales-calculated>, <https://storeleads.app/reports/shopify/EG/top-stores> — coverage, attributes, methodology, Egypt data
+- <https://storeleads.app/>, <https://storeleads.app/help/faq/what-data-is-available-for-domains>, <https://storeleads.app/help/faq/how-is-estimated-sales-calculated>, <https://storeleads.app/reports/shopify/EG/top-stores> — coverage, attributes, methodology, verified example of the public per-country report pattern
 - <https://www.outboundsalestools.com/tools/storeleads/>, <https://syncgtm.com/blog/store-leads-review-2026> — StoreLeads tiers (third-party; re-confirm before purchase)
 - <https://derrick-app.com/tools/builtwith-pricing>, <https://www.g2.com/products/builtwith/pricing> — BuiltWith tiers (third-party)
 - <https://prospeo.io/s/wappalyzer-pricing-reviews-pros-and-cons>, <https://coldiq.com/tools/wappalyzer> — Wappalyzer free tier and Pro credits

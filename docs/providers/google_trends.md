@@ -4,7 +4,10 @@
 |---|---|
 | **Capability** | Search-demand / trends data (interest over time, related queries) |
 | **Verified on** | 2026-07-11 |
-| **Context assumed** | Individual in Egypt, no registered company, single-user internal research tool |
+| **Target market** | United States |
+| **Legal entity** | Planned US LLC (not yet formed) |
+| **Operator residency** | Unspecified — notes that depend on it are flagged |
+| **Use** | Single-user internal research tool |
 | **Final classification** | `paid_option` (official API: `needs_approval`; pytrends/scraping: `blocked` as a compliant route) |
 
 ## 1. Official documentation
@@ -18,17 +21,17 @@
 
 ## 2. Access & approval requirements
 
-- **Official Trends API: still an access-controlled alpha as of 2026-07** ("very limited number of testers"). Application via a form describing intended use; approval is discretionary and rolling. No country restriction documented, so an Egyptian individual **can apply**, but a single-user internal tool is a weak application. The alpha's exact terms are shown only to admitted testers — unverifiable without approval.
-- **SerpApi / DataForSEO / Glimpse:** ordinary commercial signup (email + card); no Egypt/entity restrictions found. Realistic for an individual.
-- **Google Ads API (Keyword Planner):** needs a Google Ads account (Egypt supported for individuals — government-ID verification track; EGP billing since May 2025), a manager account, and a reviewed Basic Access developer-token application that expects a functioning website. Possible but heavyweight; approval for an internal tool uncertain.
+- **Official Trends API: still an access-controlled alpha as of 2026-07** ("very limited number of testers"). Application via a form describing intended use; approval is discretionary and rolling. No country or entity restriction documented, so any operator **can apply** (this may vary depending on the operator's country and legal entity), but a single-user internal tool is a weak application. The alpha's exact terms are shown only to admitted testers — unverifiable without approval.
+- **SerpApi / DataForSEO / Glimpse:** ordinary commercial signup (email + card); no country or entity restrictions found — realistic for an individual or an LLC. This may vary depending on the operator's country and legal entity.
+- **Google Ads API (Keyword Planner):** needs a Google Ads account (advertiser-verification requirements and billing currency vary by country — this may vary depending on the operator's country and legal entity; a US LLC would go through standard US business verification), a manager account, and a reviewed Basic Access developer-token application that expects a functioning website. Possible but heavyweight; approval for an internal tool uncertain.
 
 ## 3. Geographic & dataset coverage
 
-- **Official alpha:** interest-over-time with *consistent scaling across requests*; daily/weekly/monthly/yearly aggregation; region and sub-region breakdown (ISO 3166-2, so `EG` works); rolling ~1,800-day window; data current to ~2 days ago. Related-queries coverage in the alpha is unconfirmed — treat interest-over-time as the only confirmed dataset.
-- **SerpApi:** mirrors the public Trends UI — TIMESERIES (multi-term), RELATED_QUERIES, RELATED_TOPICS, interest-by-region; any Trends geo incl. EG; 2004–present.
+- **Official alpha:** interest-over-time with *consistent scaling across requests*; daily/weekly/monthly/yearly aggregation; region and sub-region breakdown (ISO 3166-2, so `US` and its states work); rolling ~1,800-day window; data current to ~2 days ago. Related-queries coverage in the alpha is unconfirmed — treat interest-over-time as the only confirmed dataset.
+- **SerpApi:** mirrors the public Trends UI — TIMESERIES (multi-term), RELATED_QUERIES, RELATED_TOPICS, interest-by-region; any Trends geo incl. `US`; 2004–present.
 - **DataForSEO:** UI-equivalent explore endpoint, up to 5 keywords/task.
 - **Glimpse:** Trends-equivalent plus modeled **absolute search volume** (their differentiator).
-- **Keyword Planner:** monthly search volume per country incl. Egypt, but volumes are bucketed ranges for low/no-spend accounts.
+- **Keyword Planner:** monthly search volume per country incl. the US, but volumes are bucketed ranges for low/no-spend accounts.
 
 ## 4. Pricing & rate limits
 
@@ -54,7 +57,7 @@ Yes on every route — all accept free-text terms. Caveats: long-tail product te
 
 - **Executed 2026-07-11 (auth-gate probe):** unauthenticated `GET https://trends.googleapis.com/v1alpha/trends:fetchTimeSeries?terms=wireless%20earbuds` → **HTTP 404** (not 401/403): the v1alpha surface isn't even publicly discoverable without an allowlisted project — consistent with closed alpha.
 - **Plan (SerpApi free tier, after signup):**
-  `GET https://serpapi.com/search.json?engine=google_trends&q=wireless+earbuds&data_type=TIMESERIES&geo=EG&date=today+12-m&api_key=***`, then the same query with `data_type=RELATED_QUERIES`.
+  `GET https://serpapi.com/search.json?engine=google_trends&q=wireless+earbuds&data_type=TIMESERIES&geo=US&date=today+12-m&api_key=***`, then the same query with `data_type=RELATED_QUERIES`.
 - **Plan (DataForSEO):** `POST /v3/keywords_data/google_trends/explore/live` with `[{"keywords":["wireless earbuds"],"location_code":2818,"date_from":"2025-07-01"}]` (~$0.009).
 
 ## 8. Fallback options
@@ -69,7 +72,7 @@ Yes on every route — all accept free-text terms. Caveats: long-tail product te
 
 ## 9. Final classification & rationale
 
-**`paid_option`.** The only official API remains a closed alpha with tiny quotas (worth applying to in parallel — it's free — but not plannable). Scraping routes are non-compliant. What actually works today for arbitrary product keywords from Egypt with no entity requirement is a paid third-party provider: start on **SerpApi's free tier** for prototyping, adopt **DataForSEO pay-per-task** for production use, and isolate everything behind the `TrendsProvider` interface because these vendors carry real legal/continuity risk.
+**`paid_option`.** The only official API remains a closed alpha with tiny quotas (worth applying to in parallel — it's free — but not plannable). Scraping routes are non-compliant. What actually works today for arbitrary product keywords, with no documented country or entity requirement (confirm at signup), is a paid third-party provider: start on **SerpApi's free tier** for prototyping, adopt **DataForSEO pay-per-task** for production use, and isolate everything behind the `TrendsProvider` interface because these vendors carry real legal/continuity risk.
 
 ## Sources
 
@@ -83,10 +86,9 @@ Yes on every route — all accept free-text terms. Caveats: long-tail product te
 - <https://docs.dataforseo.com/v3/keywords_data-google_trends-overview/>, <https://docs.dataforseo.com/v3/keywords_data-google-trends-explore-live/>, <https://dataforseo.com/pricing/keywords-data/google-trends> — endpoints and per-task pricing
 - <https://www.trendsmcp.ai/trendsmcp-vs-glimpse>, <https://checkthat.ai/brands/glimpse/pricing> — conflicting Glimpse pricing reports
 - <https://developers.google.com/google-ads/api/docs/api-policy/access-levels>, <https://developers.google.com/google-ads/api/docs/api-policy/developer-token> — Ads API access process and limits
-- <https://support.google.com/adspolicy/answer/9872280?hl=en&co=GENIE.CountryCode%3DEG> — Egypt individual advertiser verification
-- <https://english.ahram.org.eg/News/532880.aspx> — EGP billing for Google in Egypt
+- <https://support.google.com/adspolicy/answer/9872280> — Google Ads advertiser-verification policy (requirements vary per country)
 - <https://www.authoritas.com/blog/understanding-googles-search-volume-buckets-a-deep-dive-into-how-search-volumes-really-work>, <https://support.google.com/google-ads/thread/381084048> — Keyword Planner volume buckets
 - <https://github.com/GeneralMills/pytrends> — archived status (GitHub API, checked 2026-07-11)
 - <https://policies.google.com/terms> — automated-access prohibition
 
-**Country/entity dependencies:** no Egypt bar found for the alpha application or the paid providers (their full ToS were not directly readable from the research sandbox); Google Ads fully supports Egyptian individuals; SerpApi's US Legal Shield is a US-law construct of untested value to an Egyptian individual.
+**Country/entity dependencies:** no country bar found for the alpha application or the paid providers (their full ToS were not directly readable from the research sandbox) — this may vary depending on the operator's country and legal entity. Google Ads verification and billing are country-specific. SerpApi's "US Legal Shield" is a US-law construct — its protective value depends on the contracting entity's jurisdiction (most meaningful for a US LLC).
