@@ -17,16 +17,18 @@ V1 is a **single-user, local-first research pipeline** with an HTTP API. It does
 5. **Conclude.** An LLM reads the collected evidence (and *only* the collected evidence) and produces a structured verdict: **LAUNCH / WATCH / AVOID / INSUFFICIENT EVIDENCE**, with every claim citing evidence IDs.
 6. **Serve.** A FastAPI backend exposes this via JSON endpoints. You interact through the API docs UI (`/docs`) until the dashboard exists.
 
-**V1 sources (only these):**
+**V1 source capabilities (only these):**
 
-| Source | Provider | Why first |
+> ⚠️ **All external-source availability is UNVERIFIED until the Provider Access Spike (§8.1) is completed.** The rows below describe *desired capabilities* and *candidate implementation routes* — not guaranteed integrations. Every capability has manual evidence entry as a floor and "unavailable" as an honest terminal status.
+
+| Capability | Candidate implementation routes (to be verified in the spike) | Why first |
 |---|---|---|
-| Meta ads | Meta Ad Library API (official, free) | Strongest "someone is spending money on this" signal |
-| Search demand | Google Trends (via a compliant paid API such as SerpApi/Glimpse, or pytrends with known-fragility flag) | Demand trajectory |
-| Marketplace | One marketplace data provider (e.g. Keepa for Amazon — paid, compliant) | Price, reviews, sales-rank proxy |
-| Manual | You paste URLs/screenshots/notes as evidence | Covers everything without an API yet |
+| Meta ad intelligence | (a) an official Meta API **if our specific use case and access level support it** — the Ad Library API's scope, approval process, and dataset coverage for general ecommerce-ad search must be verified, not assumed; (b) a licensed third-party ad-intelligence provider; (c) manual evidence entry; (d) **unavailable** if no compliant route exists | Strongest "someone is spending money on this" signal |
+| Search demand (trends) | (a) the official Google Trends API — currently **access-controlled/alpha; must not be assumed available**; (b) a licensed third-party trends provider (SerpApi/Glimpse class); (c) pytrends flagged `best_effort`/fragile; (d) manual entry; (e) unavailable. Provider choice stays configurable | Demand trajectory |
+| Marketplace listings | (a) a licensed marketplace data provider (Keepa class — paid); (b) an official marketplace API if access requirements are met; (c) manual entry; (d) unavailable | Price, reviews, sales-rank proxy |
+| Manual evidence | You paste URLs/screenshots/notes — always available, no external dependency | Covers everything without an API |
 
-TikTok, Reddit, supplier APIs, review mining, and competitor-store analysis are **interface-defined in V1 but implemented later** (see §8).
+TikTok, Reddit, supplier APIs, review mining, and competitor-store analysis are **interface-defined in V1 but implemented later** (see §8). In particular, **TikTok Commercial Content API availability, geographic coverage, and approval requirements must be verified before any implementation work**.
 
 ## 2. Explicitly excluded from V1
 
@@ -72,10 +74,10 @@ outcomes can be compared against recommendations.
 
 ```mermaid
 flowchart TB
-    subgraph External["External sources"]
-        META[Meta Ad Library API]
-        TRENDS[Trends provider]
-        MKT[Marketplace provider]
+    subgraph External["External sources (routes unverified until §8.1 spike)"]
+        META[Meta ad intelligence<br/><i>route TBD</i>]
+        TRENDS[Trends provider<br/><i>route TBD</i>]
+        MKT[Marketplace provider<br/><i>route TBD</i>]
         FUTURE[TikTok / Reddit / Suppliers / Reviews / Stores<br/><i>interfaces only in V1</i>]
     end
 
@@ -184,15 +186,20 @@ class AdObservation(BaseModel):     # DTOs carry evidence fields ALWAYS
     payload: dict               # verbatim
     # + typed convenience fields: advertiser, first_seen, media_type...
 
-class AdIntelProvider(Protocol):            # Meta Ad Library, TikTok Commercial Content API
-    info: ProviderInfo
+class AdIntelProvider(Protocol):            # candidate routes: Meta official API (if
+    info: ProviderInfo                      # approved for our use case), licensed
+                                            # third party, TikTok Commercial Content API
+                                            # (availability/geo/approval unverified)
     def search_ads(self, query: str, country: str, limit: int) -> list[AdObservation]: ...
 
-class TrendsProvider(Protocol):             # SerpApi/Glimpse/pytrends
+class TrendsProvider(Protocol):             # candidate routes: official Google Trends API
+                                            # (access-controlled/alpha — not assumed),
+                                            # SerpApi/Glimpse class, pytrends (best_effort)
     def interest_over_time(self, term: str, geo: str, months: int) -> TrendObservation: ...
     def related_queries(self, term: str, geo: str) -> list[TrendObservation]: ...
 
-class MarketplaceProvider(Protocol):        # Keepa, Rainforest, later AliExpress
+class MarketplaceProvider(Protocol):        # candidate routes: Keepa, Rainforest,
+                                            # later AliExpress — all unverified
     def search_listings(self, query: str, limit: int) -> list[ListingObservation]: ...
     def get_listing(self, listing_id: str) -> ListingObservation: ...
 
@@ -217,11 +224,31 @@ Shared behavior every adapter gets from a small base class:
 - **No DB access.** Providers return DTOs; only `ingestion` persists. This keeps every provider trivially testable with recorded fixture responses.
 - **Compliance flag surfaced** in every report, so you always know which signals came from official APIs vs. best-effort sources.
 
+### 8.1 Provider Access Spike (mandatory gate before any real provider)
+
+No real external provider gets implemented — not even a prototype — until it has passed a **Provider Access Spike**. The spike is a short, structured investigation producing one record per proposed provider, stored in the repo (`docs/providers/<key>.md`) so decisions are auditable. Each record must contain:
+
+1. **Official documentation URL.**
+2. **Registration/approval requirements** — developer account, app review, business verification, waitlist, etc.
+3. **Regions and datasets covered** — exactly which countries and which data fields we would actually get.
+4. **Rate limits.**
+5. **Pricing** — including free-tier boundaries and overage behavior.
+6. **Allowed use and storage restrictions** — can we store responses? For how long? Any display/attribution requirements? Any prohibition on our use case?
+7. **A successful minimal test request** (request + redacted response captured), *if* access is available at spike time.
+8. **Fallback provider options** if this route fails.
+9. **Final status:** `usable` / `blocked` / `paid_option` / `manual_only`.
+
+Rules:
+
+- A provider adapter may only be built for a source whose spike record concludes `usable` or an accepted `paid_option`.
+- `blocked` or unresolved sources fall back to the manual provider, and reports show that signal as unavailable — the system stays honest rather than assuming access.
+- Spike records are re-checked when a provider errors persistently (API terms and access programs change).
+
 ## 9. Risk register
 
 | # | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|---|
-| R1 | **API access changes/revocation** (Meta app review, TikTok API access is regionally limited, Amazon PA-API requires affiliate sales) | High | High | Provider interface = every source replaceable; prefer paid licensed data (Keepa, SerpApi) over fragile free routes; manual-entry provider as universal fallback |
+| R1 | **API access changes/revocation/never-granted** (Meta app review, TikTok API access is regionally limited, official Google Trends API is access-controlled/alpha, Amazon PA-API requires affiliate sales) | High | High | Provider Access Spike (§8.1) gates every adapter; provider interface = every source replaceable; prefer paid licensed data over fragile free routes; manual-entry provider as universal fallback |
 | R2 | **Scraping limitations** — many targets (AliExpress, TikTok organic, Shopify stores) prohibit scraping in ToS | High | Medium | Default stance: no scraping. Use official/licensed APIs or record "signal unavailable". Any best-effort source is flagged `best_effort` and never load-bearing for a verdict |
 | R3 | **Data quality** — stale trends, geo mismatch, bot-inflated engagement | Medium | High | Store `fetched_at` everywhere; scores decay/expire; formulas versioned so bad formulas can be recomputed; outlier flags rather than silent correction |
 | R4 | **Duplicate products** — same item under 20 names/SKUs across sources | High | Medium | Matching is *assistive, never silently automatic*: system proposes links, you confirm; merge/split operations preserve observation history |
@@ -236,13 +263,16 @@ Each phase is shippable and testable on its own; each depends only on the phases
 
 1. **Phase 0 — Skeleton.** Repo layout, Docker Compose (Postgres + API), FastAPI app with `/health`, settings from env, structured logging, Alembic baseline migration, pytest wired up, `.env.example`, README.
 2. **Phase 1 — Evidence store.** Tables from §6; CRUD for candidates; the **manual provider** (paste a URL/note → raw_observation). *The system is already useful as a disciplined research notebook.*
-3. **Phase 2 — First real providers.** Provider interface + registry; Meta Ad Library adapter; trends adapter; `collection_run` orchestration; recorded-fixture tests.
-4. **Phase 3 — Catalog.** Normalization, propose-and-confirm matching, merge/split.
-5. **Phase 4 — Scoring.** Formula-versioned deterministic scores with input tracking and null-handling.
-6. **Phase 5 — Analysis.** LLM client abstraction (Anthropic + OpenAI implementations behind one interface), evidence-bundle builder, structured cited conclusions, INSUFFICIENT_EVIDENCE path.
-7. **Phase 6 — Recommendation & report.** Report assembly endpoint; decision recording.
-8. **Phase 7 — Dashboard.** Next.js app reading the existing API.
-9. **Phase 8+ — Expansion.** More providers (marketplace, TikTok, Reddit, suppliers); supplier research, offers, creative briefs, launch planning — each as a new module reusing the evidence store.
+3. **Phase 2 — Provider Access Spike (§8.1).** Investigate and document every proposed provider (Meta ad intelligence routes, trends routes, marketplace routes, TikTok, Reddit, suppliers). Output: one spike record per provider with a final status. **No adapter code is written in this phase.**
+4. **Phase 3 — First real providers.** Provider interface + registry; adapters **only for sources whose spike record is `usable` or an accepted `paid_option`**; `collection_run` orchestration; recorded-fixture tests.
+5. **Phase 4 — Catalog.** Normalization, propose-and-confirm matching, merge/split.
+6. **Phase 5 — Scoring.** Formula-versioned deterministic scores with input tracking and null-handling.
+7. **Phase 6 — Analysis.** LLM client abstraction (Anthropic + OpenAI implementations behind one interface), evidence-bundle builder, structured cited conclusions, INSUFFICIENT_EVIDENCE path.
+8. **Phase 7 — Recommendation & report.** Report assembly endpoint; decision recording.
+9. **Phase 8 — Dashboard.** Next.js app reading the existing API.
+10. **Phase 9+ — Expansion.** More providers (each gated by its own spike record); supplier research, offers, creative briefs, launch planning — each as a new module reusing the evidence store.
+
+Milestone M0 (§12) sits in Phase 0 and **does not call any real external provider**.
 
 ## 11. Local development tools to install
 
