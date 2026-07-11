@@ -37,6 +37,29 @@ WHERE ro.candidate_id = 'your-candidate-id'
 ORDER BY ro.created_at DESC;
 ```
 
+## Candidate identity (ASIN dedup)
+
+```sql
+-- Which external product id (e.g. Amazon ASIN) maps to which candidate.
+-- Identity is (source, external_id), never the candidate name.
+SELECT
+    s.key AS source,
+    cei.external_id,
+    c.name,
+    c.id AS candidate_id,
+    cei.created_at
+FROM candidate_external_ids cei
+JOIN candidates c ON c.id = cei.candidate_id
+JOIN sources s ON s.id = cei.source_id
+ORDER BY cei.created_at DESC;
+
+-- Confirm dedup held: no (source, external_id) pair appears twice.
+SELECT source_id, external_id, COUNT(*)
+FROM candidate_external_ids
+GROUP BY source_id, external_id
+HAVING COUNT(*) > 1;
+```
+
 ## Facts: Current Truth Values
 
 ```sql

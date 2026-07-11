@@ -19,6 +19,11 @@ class Settings(BaseSettings):
     # Required — the app refuses to start without a database URL.
     database_url: str
 
+    # Keepa API key. Optional so the app boots without it; the Keepa
+    # collection command fails loudly if it is missing. NEVER hard-code a
+    # key — it lives only in this environment variable.
+    keepa_api_key: str | None = None
+
 
 @lru_cache
 def get_settings() -> Settings:

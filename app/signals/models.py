@@ -15,6 +15,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import (
+    CheckConstraint,
     DateTime,
     ForeignKey,
     Numeric,
@@ -39,7 +40,8 @@ class Fact(Base):
     candidate_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("candidates.id"))
     fact_type: Mapped[str] = mapped_column(Text)
     value: Mapped[dict] = mapped_column(JSONB)
-    source_observation_id: Mapped[uuid.UUID | None] = mapped_column(
+    # NOT NULL: every fact must cite exactly one stored raw observation.
+    source_observation_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("raw_observations.id")
     )
     observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
@@ -60,6 +62,16 @@ def _reject_fact_delete(mapper, connection, target):  # noqa: ARG001
 
 class Signal(Base):
     __tablename__ = "signals"
+    __table_args__ = (
+        CheckConstraint(
+            "confidence >= 0 AND confidence <= 1",
+            name="ck_signals_confidence_range",
+        ),
+        CheckConstraint(
+            "jsonb_typeof(fact_ids) = 'array' AND jsonb_array_length(fact_ids) >= 1",
+            name="ck_signals_fact_ids_nonempty",
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         Uuid, primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()")
@@ -68,7 +80,9 @@ class Signal(Base):
     signal_type: Mapped[str] = mapped_column(Text)
     detector_version: Mapped[str] = mapped_column(Text)
     confidence: Mapped[float] = mapped_column(Numeric(5, 4))
-    fact_ids: Mapped[list] = mapped_column(JSONB, default=list, server_default=text("'[]'::jsonb"))
+    # NOT NULL and non-empty (enforced by check constraint): a signal must cite
+    # the facts it was computed from.
+    fact_ids: Mapped[list] = mapped_column(JSONB)
     computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=text("now()")

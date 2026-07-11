@@ -1,4 +1,10 @@
-"""Data access for Facts, Signals, and Events."""
+"""Data access for Facts, Signals, and Events.
+
+Application-layer validation mirrors the database constraints so callers get a
+clear Python error instead of an opaque IntegrityError:
+- a Fact must cite a source observation;
+- a Signal must have confidence in [0, 1] and cite at least one fact.
+"""
 
 import uuid
 from datetime import datetime
@@ -15,9 +21,12 @@ def create_fact(
     fact_type: str,
     value: dict,
     observed_at: datetime,
-    source_observation_id: uuid.UUID | None = None,
+    source_observation_id: uuid.UUID,
 ) -> Fact:
-    """Create and persist a Fact."""
+    """Create and persist a Fact. source_observation_id is required: a fact with
+    no stored observation behind it is not traceable evidence and is rejected."""
+    if source_observation_id is None:
+        raise ValueError("source_observation_id is required: every fact must cite an observation")
     fact = Fact(
         candidate_id=candidate_id,
         fact_type=fact_type,
@@ -35,11 +44,16 @@ def get_latest_fact_of_type(
     candidate_id: uuid.UUID,
     fact_type: str,
 ) -> Fact | None:
-    """Get the most recent fact of a given type for a candidate."""
+    """The current truth: the most recent fact of a type for a candidate.
+
+    Call this BEFORE inserting a new fact to obtain the immediately prior fact.
+    Calling it after an insert would return the just-inserted row (the newest),
+    which is never what a change detector wants.
+    """
     return session.execute(
         select(Fact)
         .where(Fact.candidate_id == candidate_id, Fact.fact_type == fact_type)
-        .order_by(Fact.created_at.desc())
+        .order_by(Fact.created_at.desc(), Fact.id.desc())
         .limit(1)
     ).scalar_one_or_none()
 
@@ -51,15 +65,21 @@ def create_signal(
     detector_version: str,
     confidence: float,
     computed_at: datetime,
-    fact_ids: list[uuid.UUID] | None = None,
+    fact_ids: list[uuid.UUID],
 ) -> Signal:
-    """Create and persist a Signal."""
+    """Create and persist a Signal. Enforces confidence in [0, 1] and a non-empty
+    fact_ids list at the application layer (the database enforces the same)."""
+    if not 0.0 <= float(confidence) <= 1.0:
+        raise ValueError(f"confidence must be within [0, 1], got {confidence}")
+    if not fact_ids:
+        raise ValueError("fact_ids must cite at least one fact")
     signal = Signal(
         candidate_id=candidate_id,
         signal_type=signal_type,
         detector_version=detector_version,
         confidence=confidence,
-        fact_ids=fact_ids or [],
+        # JSONB stores strings, not UUID objects — normalize here.
+        fact_ids=[str(fid) for fid in fact_ids],
         computed_at=computed_at,
     )
     session.add(signal)

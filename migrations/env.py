@@ -4,6 +4,7 @@ from logging.config import fileConfig
 # (required for autogenerate support later).
 import app.catalog.models  # noqa: F401
 import app.ingestion.models  # noqa: F401
+import app.signals.models  # noqa: F401
 from alembic import context
 from app.core.config import get_settings
 from app.core.db import Base

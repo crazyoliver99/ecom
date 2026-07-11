@@ -20,6 +20,9 @@ dev = [
     "ruff==0.15.21",
 ]
 
+[project.scripts]
+ecom = "app.cli:main"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

@@ -1,130 +1,143 @@
 """Signal detectors: deterministic algorithms that emit signals from facts.
 
-Each detector:
-- Takes facts and prior signals as input
-- Outputs zero or more signals with versioned logic
-- Is provider-agnostic (emits standardized signal types)
-- Records its version in signal.detector_version for auditability
+A detector is a versioned, mechanical rule (OPERATING_SYSTEM.md §4). It receives
+the newly created Fact and the immediately prior Fact of the same type (fetched
+BEFORE the new one was inserted, so it can never be the new fact itself), and
+returns zero or more Signals. Detectors never query for the "latest" fact
+themselves — the orchestrator passes prior explicitly.
 
-Provider-specific detectors (e.g., Keepa's rank-improvement detector) live in
-the provider adapter and call these to emit standardized signals.
+Confidence is a versioned, deterministic formula output, never a constant and
+never a judgment. Each detector documents its exact formula and carries a
+version string so a stored signal can be reproduced or rolled back.
+
+Signal types are provider-agnostic. These detectors are Keepa's, but the
+`new_bestseller_detected` / `rank_improved` signals they emit look identical to
+any other marketplace provider's equivalent detections.
 """
 
-import uuid
 from datetime import UTC, datetime
-from typing import Protocol
 
 from sqlalchemy.orm import Session
 
-from app.signals.models import Signal
-from app.signals.repository import create_signal, get_latest_fact_of_type
+from app.signals.models import Fact, Signal
+from app.signals.repository import create_signal
+
+# Detector versions. Bump when a formula changes; stored signals keep the version
+# that produced them so old values remain reproducible (OPERATING_SYSTEM.md §6).
+NEW_BESTSELLER_DETECTOR_VERSION = "1.0"
+RANK_IMPROVED_DETECTOR_VERSION = "1.0"
+
+SALES_RANK_FACT_TYPE = "sales_rank"
 
 
-class SignalDetector(Protocol):
-    """Protocol for a signal detector function.
+def _clamp_unit(x: float) -> float:
+    """Clamp to [0, 1] — the valid confidence range."""
+    return max(0.0, min(1.0, x))
 
-    A detector examines facts for a candidate and decides whether to emit signals.
-    Outputs are appended: detectors never modify prior signals, only add new ones.
+
+def new_bestseller_confidence(position: int, list_size: int) -> float:
+    """Confidence for new_bestseller_detected, formula v1.0.
+
+        confidence = 1 - (position - 1) / list_size
+
+    `position` is the product's 1-indexed slot in the bestseller list we fetched
+    and `list_size` is the number of entries in that list. A debut at position 1
+    yields 1.0; a debut near the bottom of an N-item list yields ~1/N. Confidence
+    therefore scales with how strong the bestseller-list position is. Result is
+    clamped to [0, 1].
     """
-
-    def __call__(
-        self,
-        session: Session,
-        candidate_id: uuid.UUID,
-        fact_type: str,
-        new_fact_value: dict,
-        now: datetime = datetime.now(UTC),
-    ) -> list[Signal]:
-        """Detect signals from a new fact.
-
-        Args:
-            session: Database session for reading prior facts and emitting signals
-            candidate_id: The candidate this fact belongs to
-            fact_type: The type of fact that changed
-            new_fact_value: The new fact's value (dict, structure varies by fact_type)
-            now: Current time for signal.computed_at
-
-        Returns:
-            List of signals emitted (may be empty)
-        """
+    if list_size <= 0:
+        raise ValueError("list_size must be positive")
+    return _clamp_unit(1.0 - (position - 1) / list_size)
 
 
-# Keepa-specific detectors
+def rank_improved_confidence(prior_rank: int, new_rank: int) -> float:
+    """Confidence for rank_improved, formula v1.0.
+
+        confidence = (prior_rank - new_rank) / prior_rank
+
+    This is the fractional (percentage) magnitude of the improvement in Amazon
+    sales rank: a rank moving 50000 -> 40000 scores 0.20, while 50000 -> 500
+    scores ~0.99. Confidence scales with how large the improvement is relative to
+    where it started. Result is clamped to [0, 1].
+    """
+    if prior_rank <= 0:
+        raise ValueError("prior_rank must be positive")
+    return _clamp_unit((prior_rank - new_rank) / prior_rank)
 
 
 def keepa_new_bestseller_detected(
     session: Session,
-    candidate_id: uuid.UUID,
-    fact_type: str,
-    new_fact_value: dict,
-    now: datetime = datetime.now(UTC),
+    new_fact: Fact,
+    prior_fact: Fact | None,
+    *,
+    now: datetime | None = None,
 ) -> list[Signal]:
-    """Detect new bestseller: sales_rank < 100k and no prior sales_rank fact.
+    """Emit `new_bestseller_detected` when a product first appears with a
+    sales-rank fact (prior_fact is None). Cites the new fact.
 
-    Fires once per candidate when Keepa first detects a product in the bestseller
-    ranking. Does not fire on every rank update, only on initial entry.
-
-    Detector version: 1.0 (formula: sales_rank < 100000 and no prior fact)
+    Detector version: 1.0. Confidence: new_bestseller_confidence().
     """
-    if fact_type != "sales_rank":
+    if now is None:
+        now = datetime.now(UTC)
+    if new_fact.fact_type != SALES_RANK_FACT_TYPE:
         return []
-
-    sales_rank = new_fact_value.get("rank")
-    if sales_rank is None or sales_rank >= 100000:
-        return []
-
-    prior_fact = get_latest_fact_of_type(session, candidate_id, "sales_rank")
     if prior_fact is not None:
         return []
 
+    position = new_fact.value.get("bestseller_position")
+    list_size = new_fact.value.get("bestseller_list_size")
+    if position is None or list_size is None:
+        return []
+
+    confidence = new_bestseller_confidence(int(position), int(list_size))
     signal = create_signal(
-        session=session,
-        candidate_id=candidate_id,
+        session,
+        candidate_id=new_fact.candidate_id,
         signal_type="new_bestseller_detected",
-        detector_version="1.0",
-        confidence=1.0,
+        detector_version=NEW_BESTSELLER_DETECTOR_VERSION,
+        confidence=confidence,
         computed_at=now,
-        fact_ids=[],
+        fact_ids=[new_fact.id],
     )
     return [signal]
 
 
 def keepa_rank_improved(
     session: Session,
-    candidate_id: uuid.UUID,
-    fact_type: str,
-    new_fact_value: dict,
-    now: datetime = datetime.now(UTC),
+    new_fact: Fact,
+    prior_fact: Fact | None,
+    *,
+    now: datetime | None = None,
 ) -> list[Signal]:
-    """Detect rank improvement: sales_rank < prior_fact.sales_rank.
+    """Emit `rank_improved` when the Amazon sales rank improves (new rank is
+    numerically smaller than the prior rank). Cites both the prior and new facts.
+    Does not fire on unchanged or worsened rank, or without a prior fact.
 
-    Fires whenever the rank improves (numerically decreases). Does not fire on
-    unchanged or worsened rank.
-
-    Detector version: 1.0 (formula: new_rank < old_rank)
+    Detector version: 1.0. Confidence: rank_improved_confidence().
     """
-    if fact_type != "sales_rank":
+    if now is None:
+        now = datetime.now(UTC)
+    if new_fact.fact_type != SALES_RANK_FACT_TYPE:
         return []
-
-    new_rank = new_fact_value.get("rank")
-    if new_rank is None:
-        return []
-
-    prior_fact = get_latest_fact_of_type(session, candidate_id, "sales_rank")
     if prior_fact is None:
         return []
 
+    new_rank = new_fact.value.get("rank")
     prior_rank = prior_fact.value.get("rank")
-    if prior_rank is None or new_rank >= prior_rank:
+    if new_rank is None or prior_rank is None:
+        return []
+    if new_rank >= prior_rank:
         return []
 
+    confidence = rank_improved_confidence(int(prior_rank), int(new_rank))
     signal = create_signal(
-        session=session,
-        candidate_id=candidate_id,
+        session,
+        candidate_id=new_fact.candidate_id,
         signal_type="rank_improved",
-        detector_version="1.0",
-        confidence=1.0,
+        detector_version=RANK_IMPROVED_DETECTOR_VERSION,
+        confidence=confidence,
         computed_at=now,
-        fact_ids=[],
+        fact_ids=[prior_fact.id, new_fact.id],
     )
     return [signal]

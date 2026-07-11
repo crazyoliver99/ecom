@@ -4,10 +4,14 @@ Internal ecommerce product research and decision system. One user, one machine,
 no cloud. The architecture and roadmap live in [`docs/FOUNDATION.md`](docs/FOUNDATION.md)
 — read that first.
 
-**Current state: Milestone M2 Foundation** — the signals layer is built. You can register
-product candidates and attach evidence. The system now has a complete observation → fact → signal → event pipeline
-(deterministic, append-only, provider-agnostic). The Keepa provider adapter is a stub ready for implementation.
-No live providers yet, no scoring, no AI (by design — see the phased plan in the foundation doc).
+**Current state: Milestone M2** — the first autonomous provider. On top of the M1
+research notebook, Atlas now has a complete, deterministic **observation → fact →
+signal → event** pipeline and a working **Keepa** collection job that runs it end
+to end over a fixed US bestseller category. Everything in this layer is
+append-only and provider-agnostic. No scoring and no AI yet (by design — see the
+phased plan in the foundation doc). Keepa is the *reference* provider: a second
+provider reuses this machinery and only adds its own adapter + collection job
+(see `app/signals/README.md`).
 
 ---
 
@@ -79,6 +83,43 @@ endpoint has a "Try it out" button that turns it into a form.
    `{"status": "collecting"}` (allowed: `new`, `collecting`, `analyzed`,
    `decided`), and `GET /candidates?status=collecting` to see what's in flight.
 
+## Running the Keepa collection
+
+The Keepa job runs one pass over a fixed US bestseller category and persists
+observations, facts, signals, and events. It reads the API key **only** from
+`KEEPA_API_KEY` (add it to your `.env`; never hard-code it):
+
+```bash
+# One-off run (defaults: category 3760901, up to 20 products):
+KEEPA_API_KEY=your-key uv run python -m app.cli collect-keepa
+
+# Override the category node or product cap:
+KEEPA_API_KEY=your-key uv run python -m app.cli collect-keepa --category 3760901 --max-products 20
+```
+
+Exit codes: `0` success (including a legitimately empty bestseller list), `1`
+provider failure (the run is recorded `failed` and a `ProviderFailed` event is
+persisted; no candidates/facts/signals are created), `2` missing/invalid
+`KEEPA_API_KEY`.
+
+### Scheduling it (cron)
+
+To collect once a day at 07:00, add a crontab entry that loads the key from the
+environment and runs the command from the project directory:
+
+```cron
+# m h dom mon dow   command
+0 7 * * *  cd /path/to/ecom && KEEPA_API_KEY=your-key /path/to/uv run python -m app.cli collect-keepa >> /var/log/ecom-keepa.log 2>&1
+```
+
+Each run is a fresh `collection_run`; facts and signals accumulate over days, so
+`rank_improved` signals begin to fire on the second and later runs as ranks move.
+
+### Inspecting what it collected
+
+`docs/SQL_QUERIES.md` has copy-paste SQL for reading back candidates, the current
+truth per fact type, fired signals, and the event audit trail.
+
 ## Running the tests
 
 The tests need a **dedicated test database** (`TEST_DATABASE_URL` in your
@@ -131,8 +172,9 @@ app/
   signals/         owns: facts, signals, events (OPERATING_SYSTEM.md §4)
                    fact & signal repositories, detector functions, orchestrator
                    (append-only, enforced via ORM; See README.md for extending)
-  catalog/         owns: candidates (products come in a later phase)
-  providers/       external source adapters (Keepa stub in place)
+  catalog/         owns: candidates + external-id map (ASIN dedup)
+  providers/       external source adapters (Keepa HTTP client; returns DTOs only)
+  collection/      collection jobs that wire a provider to persistence (Keepa job)
   scoring/         stub — deterministic scores
   analysis/        stub — LLM conclusions
   recommendation/  stub — final reports

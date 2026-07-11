@@ -9,6 +9,7 @@ EXPECTED_TABLES = {
     "facts",
     "signals",
     "events",
+    "candidate_external_ids",
 }
 
 
@@ -101,20 +102,52 @@ def _collection_runs_candidate_nullable(db_url: str) -> bool:
         engine.dispose()
 
 
+def _facts_source_observation_not_null(db_url: str) -> bool:
+    engine = create_engine(db_url)
+    try:
+        for col in inspect(engine).get_columns("facts"):
+            if col["name"] == "source_observation_id":
+                return not col["nullable"]
+        return False
+    finally:
+        engine.dispose()
+
+
+def _signal_check_constraints(db_url: str) -> set[str]:
+    engine = create_engine(db_url)
+    try:
+        with engine.connect() as conn:
+            rows = conn.execute(
+                text(
+                    "SELECT conname FROM pg_constraint "
+                    "WHERE conrelid = 'signals'::regclass AND contype = 'c'"
+                )
+            ).all()
+        return {r[0] for r in rows}
+    finally:
+        engine.dispose()
+
+
 def test_migration_0003_round_trip(alembic_config, db_url):
-    # At head: Facts, Signals, Events tables exist; Keepa source seeded.
+    new_tables = {"facts", "signals", "events", "candidate_external_ids"}
+
+    # At head: new tables exist; Keepa source seeded; constraints present.
     command.upgrade(alembic_config, "head")
-    assert _tables_include(db_url, {"facts", "signals", "events"})
+    assert _tables_include(db_url, new_tables)
     assert _keepa_source_exists(db_url)
     assert _collection_runs_candidate_nullable(db_url)
+    assert _facts_source_observation_not_null(db_url)
+    checks = _signal_check_constraints(db_url)
+    assert "ck_signals_confidence_range" in checks
+    assert "ck_signals_fact_ids_nonempty" in checks
 
     # Downgrade to 0002: new tables and Keepa source gone.
     command.downgrade(alembic_config, "0002")
-    assert not _tables_include(db_url, {"facts", "signals", "events"})
+    assert not _tables_include(db_url, new_tables)
     assert not _keepa_source_exists(db_url)
     assert not _collection_runs_candidate_nullable(db_url)
 
     # Back up, leaving the database at head.
     command.upgrade(alembic_config, "head")
-    assert _tables_include(db_url, {"facts", "signals", "events"})
+    assert _tables_include(db_url, new_tables)
     assert _keepa_source_exists(db_url)

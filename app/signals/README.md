@@ -1,123 +1,84 @@
 # Signals Layer
 
-The signals layer (OPERATING_SYSTEM.md §4) bridges provider observations and reasoning:
+The signals layer (OPERATING_SYSTEM.md §4) sits between provider observations and reasoning:
 
-**observations** → **facts** → **signals** → **opportunities**
+**observations → facts → signals → (later) opportunities**
 
-## Architecture
+Everything here is deterministic and append-only. Nothing in this layer uses an LLM or a judgment call.
+
+## The three tables
 
 ### Facts (append-only)
-Raw observations are turned into facts — the current truth values for observable properties at a point in time. Multiple facts of the same type supersede prior versions; the newest is the current truth.
+A fact is the current truth value of one observable property at a point in time. A new fact of the same type for the same candidate *supersedes* the prior one — the newest non-stale fact is the current truth. Older facts are never updated or deleted.
 
-Example: Keepa observation with sales_rank=50000 becomes a fact `{type: "sales_rank", value: {rank: 50000}}`.
+- `source_observation_id` is **NOT NULL**: every fact cites exactly one stored raw observation. A fact with no observation behind it is not traceable evidence and cannot exist.
+- Example: a Keepa product observation becomes a `sales_rank` fact whose value is `{asin, rank, bestseller_position, bestseller_list_size, category_id}`.
 
 ### Signals (append-only, deterministic)
-Signals are fired by detectors when facts change meaningfully. Each signal:
-- Has a versioned detector (for auditability)
-- Outputs a confidence score from a versioned formula (never agent judgment)
-- References the facts it derived from
-- Is provider-agnostic (e.g., `rank_improved` not `keepa_rank_improved`)
-
-Example: When sales_rank < prior_rank, the `rank_improved` signal fires with confidence=1.0.
+A signal is a versioned, mechanical detection that something meaningful changed. Each signal:
+- carries a `detector_version` (so a stored signal can be reproduced or rolled back);
+- carries a `confidence` in **[0, 1]** produced by a **versioned formula**, never a constant and never a judgment (enforced by a DB check constraint and by the repository);
+- cites the facts it was computed from in `fact_ids`, which must be a **non-empty** array (enforced by a DB check constraint and by the repository);
+- is **provider-agnostic**: the type is `rank_improved`, not `keepa_rank_improved`. A second marketplace's detector emits the identical signal type.
 
 ### Events (append-only)
-An audit log of what happened: when collections succeeded/failed, when facts changed, when signals fired. Downstream logic (agents, dashboards, diagnostics) subscribes to events.
+The audit trail of what happened, and the trigger surface for downstream logic. Types emitted by this milestone:
+`NewProductDiscovered`, `EvidenceCollected`, `EvidenceChanged`, `SignalDetected`, `ProviderFailed`.
 
-## Implementing a New Provider
+## Detectors and the prior fact
 
-The goal: make the second provider take 10% of the effort of the first (Keepa). Follow this pattern:
-
-### 1. Provider Adapter (`app/providers/<name>.py`)
-- Fetches data from the external API
-- Returns observations (provider-specific DTO)
-- No database writes (returns DTOs only)
-- Example: `app/providers/keepa.py` fetches bestsellers from Keepa
-
-### 2. Fact Extractors
-In your provider adapter, define extractors that turn observations into facts:
+A detector receives the **newly created fact** and the **immediately prior fact** explicitly:
 
 ```python
-def keepa_bestseller_to_facts(payload: dict) -> list[tuple[str, dict, datetime]]:
-    """Extract facts from a Keepa bestseller observation."""
-    asin = payload["asin"]
-    rank = payload["sales_rank"]
-    return [
-        ("sales_rank", {"rank": rank, "asin": asin}, datetime.fromisoformat(payload["observed_at"])),
-    ]
+def keepa_rank_improved(session, new_fact, prior_fact, *, now=None) -> list[Signal]:
+    ...
 ```
 
-Register in `fact_extractors` dict: `{"keepa_bestseller_product": keepa_bestseller_to_facts}`
+The orchestrator fetches the prior fact (`get_latest_fact_of_type`) **before** inserting the new one, so a detector can never mistake the new fact for its own "prior". Detectors never query for the latest fact themselves.
 
-### 3. Signal Detectors (`app/signals/detectors.py`)
-Define detectors that examine facts and emit provider-agnostic signals:
+### Confidence formulas (versioned)
 
-```python
-def rank_improved(session, candidate_id, fact_type, new_fact_value, now):
-    """Detect rank improvement: sales_rank < prior_fact.sales_rank."""
-    if fact_type != "sales_rank":
-        return []
-    new_rank = new_fact_value.get("rank")
-    prior_fact = get_latest_fact_of_type(session, candidate_id, "sales_rank")
-    if prior_fact and new_rank < prior_fact.value.get("rank"):
-        return [create_signal(...)]
-    return []
+**`new_bestseller_detected` — detector v1.0.** Fires on initial discovery (no prior sales_rank fact). Cites the new fact.
+
+```
+confidence = 1 - (bestseller_position - 1) / bestseller_list_size     # clamped to [0, 1]
 ```
 
-Register in `signal_detectors` dict: `{"sales_rank": [rank_improved, ...]}`
+Position 1 of an N-item list scores 1.0; a debut near the bottom scores ~1/N. Confidence scales with how strong the bestseller-list position is.
 
-### 4. Collection Job
-Wire together the adapter, extractors, and detectors in your collection job:
+**`rank_improved` — detector v1.0.** Fires when the Amazon sales rank improves (new rank numerically smaller than prior). Does not fire on unchanged or worse rank, or without a prior fact. Cites **both** the prior and the new fact.
 
-```python
-from app.signals.service import SignalOrchestrator
-
-orchestrator = SignalOrchestrator(session)
-facts, signals, events = orchestrator.process_observation(
-    observation,
-    fact_extractors={
-        "keepa_bestseller_product": keepa_bestseller_to_facts,
-    },
-    signal_detectors={
-        "sales_rank": [
-            keepa_new_bestseller_detected,
-            keepa_rank_improved,
-        ],
-    },
-)
-session.commit()
+```
+confidence = (prior_rank - new_rank) / prior_rank                     # clamped to [0, 1]
 ```
 
-## Key Design Points
+A move of 50000→40000 scores 0.20; 50000→500 scores ~0.99. Confidence scales with the fractional magnitude of the improvement.
 
-1. **No provider-specific signal types.** Signals are provider-agnostic. Keepa's `rank_improved` signal has the same type as an AliExpress ranking signal. The detector version disambiguates the source logic.
+## Adding a second provider (the 10% goal)
 
-2. **Append-only everywhere.** Facts, Signals, Events cannot be updated or deleted. New versions are added, never replace old ones. This preserves auditability and makes rollback tractable.
+The reference provider is Keepa (`app/providers/keepa.py` + `app/collection/keepa_job.py`). A second provider reuses the orchestrator, the events, the append-only tables, and the ASIN-style dedup mechanism unchanged. You write only:
 
-3. **Deterministic signals.** Signals are computed from facts via versioned formulas, never agent judgment. Confidence is a number, not "maybe". This makes signals reproducible and auditable.
+1. **A provider adapter** in `app/providers/<name>.py` — returns raw payloads, never writes the DB (see `providers/README.md`).
+2. **A fact extractor** — `function(observation) -> [(fact_type, value, observed_at)]`.
+3. **A collection job** in `app/collection/<name>_job.py` — mirror `keepa_job.py`: create the run, call the adapter (provider I/O before any write), dedup candidates by external id (`CandidateRepository.get_or_create_by_external_id`), store observations, and hand each to `SignalOrchestrator.process_observation`.
+4. **(Optional) new detectors** in `app/signals/detectors.py` if the provider surfaces a new pattern — but reuse existing provider-agnostic signal types wherever the meaning matches.
 
-4. **Provider isolation.** The provider adapter is a black box. New providers don't modify Keepa's code, they just add their own adapter alongside it.
+You do **not** modify the Keepa adapter, the orchestrator, the models, or the migration.
 
-5. **Event subscribers.** Downstream logic (Opportunity agents, dashboards, alert systems) subscribes to events, not to facts/signals directly. This decouples collection from reasoning.
+## Running the Keepa collection
+
+```bash
+# Requires KEEPA_API_KEY in the environment (never hard-coded).
+python -m app.cli collect-keepa --category 3760901 --max-products 20
+```
+
+See the repository README for cron setup and the SQL inspection queries in `docs/SQL_QUERIES.md`.
 
 ## Testing
 
-Run signal tests:
 ```bash
-pytest tests/test_signals.py -v
-```
-
-Run migration tests (including 0003):
-```bash
-pytest tests/test_migrations.py::test_migration_0003_round_trip -v
-```
-
-Test append-only enforcement:
-```bash
-# Facts, Signals, Events all reject updates and deletes
-pytest tests/test_signals.py::TestFactAppendOnly -v
-```
-
-Test detector logic:
-```bash
-pytest tests/test_signals.py::TestKeepaRankImproved -v
+uv run pytest tests/test_signals.py          # facts, signals, events, detectors, formulas
+uv run pytest tests/test_keepa_client.py     # HTTP client: parsing, error classes, retries (offline)
+uv run pytest tests/test_keepa_collection.py # end-to-end pipeline over fixture-driven runs
+uv run pytest tests/test_migrations.py       # migration round-trip incl. constraints
 ```
